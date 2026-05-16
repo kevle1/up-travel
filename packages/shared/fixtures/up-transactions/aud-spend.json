@@ -1,0 +1,17 @@
+{
+  "id": "fixture-aud-spend-1",
+  "attributes": {
+    "status": "SETTLED",
+    "rawText": "MERCHANT_AUD",
+    "description": "Merchant AUD",
+    "amount": { "value": "-25.00", "valueInBaseUnits": -2500, "currencyCode": "AUD" },
+    "foreignAmount": null,
+    "createdAt": "2025-09-15T12:00:00+10:00"
+  },
+  "relationships": {
+    "account": { "data": { "id": "spending", "type": "accounts" } },
+    "category": { "data": { "id": "restaurants-and-cafes", "type": "categories" } },
+    "parentCategory": { "data": { "id": "good-life", "type": "categories" } },
+    "transferAccount": { "data": null }
+  }
+}

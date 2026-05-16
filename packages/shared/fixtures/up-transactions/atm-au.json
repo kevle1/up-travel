@@ -1,0 +1,17 @@
+{
+  "id": "fixture-atm-au-1",
+  "attributes": {
+    "status": "SETTLED",
+    "rawText": "ATM CASH WITHDRAWAL WESTPAC",
+    "description": "ATM Withdrawal",
+    "amount": { "value": "-200.00", "valueInBaseUnits": -20000, "currencyCode": "AUD" },
+    "foreignAmount": null,
+    "createdAt": "2025-09-17T10:30:00+10:00"
+  },
+  "relationships": {
+    "account": { "data": { "id": "spending", "type": "accounts" } },
+    "category": { "data": { "id": "cash-withdrawals", "type": "categories" } },
+    "parentCategory": { "data": { "id": "transport", "type": "categories" } },
+    "transferAccount": { "data": null }
+  }
+}

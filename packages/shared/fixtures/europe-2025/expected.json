@@ -1,0 +1,5 @@
+{
+  "spent": 0,
+  "byCategory": { "good-life": 0, "transport": 0, "personal": 0, "home": 0, "cash": 0 },
+  "byCity": { "Berlin, DE": 0, "Paris, FR": 0, "Lisbon, PT": 0, "Barcelona, ES": 0, "Rome, IT": 0, "Amsterdam, NL": 0 }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "fixture-transfer-out-1",
+  "attributes": {
+    "status": "SETTLED",
+    "rawText": "TRANSFER TO SAVER",
+    "description": "Transfer to Saver",
+    "amount": { "value": "-100.00", "valueInBaseUnits": -10000, "currencyCode": "AUD" },
+    "foreignAmount": null,
+    "createdAt": "2025-09-16T09:00:00+10:00"
+  },
+  "relationships": {
+    "account": { "data": { "id": "spending", "type": "accounts" } },
+    "category": { "data": null },
+    "parentCategory": { "data": null },
+    "transferAccount": { "data": { "id": "saver-1", "type": "accounts" } }
+  }
+}
