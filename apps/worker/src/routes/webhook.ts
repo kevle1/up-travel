@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { verifyUpWebhook } from "../webhook/verify";
+import { UpClient } from "../up/client";
+import { syncSingle } from "../sync/single";
 import type { Env } from "../env";
 
 export const webhookRouter = new Hono<{ Bindings: Env }>();
@@ -19,8 +21,10 @@ webhookRouter.post("/up", async (c) => {
       data?: { attributes?: { eventType?: string }; relationships?: { transaction?: { data?: { id?: string } } } };
     };
     const eventType = parsed.data?.attributes?.eventType;
-    if (eventType === "TRANSACTION_CREATED" || eventType === "TRANSACTION_SETTLED") {
-      console.warn("webhook received", eventType, parsed.data?.relationships?.transaction?.data?.id);
+    const txnId = parsed.data?.relationships?.transaction?.data?.id;
+    if ((eventType === "TRANSACTION_CREATED" || eventType === "TRANSACTION_SETTLED") && txnId) {
+      const up = new UpClient({ token: c.env.UP_API_TOKEN, base: c.env.UP_API_BASE });
+      c.executionCtx.waitUntil(syncSingle({ db: c.env.DB, up, txnId }).catch((e) => console.error("webhook sync error", e)));
     }
   } catch (e) {
     console.error("webhook parse error", e);
