@@ -32,7 +32,11 @@ function makeDate(year: number, month: number, day: number): string | null {
 function tryDayRangeMonth(line: string, year: number): ParsedItineraryEntry | null {
   const m = /^(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z]{3,9})\s+(.+?)\s*,\s*([A-Z]{2})$/.exec(line);
   if (!m) return null;
-  const [, d1, d2, mon, city, cc] = m;
+  const d1 = m[1]!;
+  const d2 = m[2]!;
+  const mon = m[3]!;
+  const city = m[4]!;
+  const cc = m[5]!;
   const monthN = MONTHS[mon.toLowerCase().slice(0, 3)];
   if (!monthN) return null;
   const s = makeDate(year, monthN, Number(d1));
@@ -44,7 +48,11 @@ function tryDayRangeMonth(line: string, year: number): ParsedItineraryEntry | nu
 function tryMonthDayRange(line: string, year: number): ParsedItineraryEntry | null {
   const m = /^([A-Za-z]{3,9})\s+(\d{1,2})\s*-\s*(\d{1,2})\s+(.+?)\s*,\s*([A-Z]{2})$/.exec(line);
   if (!m) return null;
-  const [, mon, d1, d2, city, cc] = m;
+  const mon = m[1]!;
+  const d1 = m[2]!;
+  const d2 = m[3]!;
+  const city = m[4]!;
+  const cc = m[5]!;
   const monthN = MONTHS[mon.toLowerCase().slice(0, 3)];
   if (!monthN) return null;
   const s = makeDate(year, monthN, Number(d1));
@@ -56,7 +64,12 @@ function tryMonthDayRange(line: string, year: number): ParsedItineraryEntry | nu
 function trySlashRange(line: string, year: number): ParsedItineraryEntry | null {
   const m = /^(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2})\/(\d{1,2})\s+(.+?)\s*,\s*([A-Z]{2})$/.exec(line);
   if (!m) return null;
-  const [, d1, m1, d2, m2, city, cc] = m;
+  const d1 = m[1]!;
+  const m1 = m[2]!;
+  const d2 = m[3]!;
+  const m2 = m[4]!;
+  const city = m[5]!;
+  const cc = m[6]!;
   const s = makeDate(year, Number(m1), Number(d1));
   const e = makeDate(year, Number(m2), Number(d2));
   if (!s || !e) return null;
