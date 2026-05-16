@@ -6,7 +6,7 @@
 
 ## 1. Summary
 
-A personal trip budget tracker for a year-long trip with an $80,000 AUD target, optimised for *underspending*. Connects to Up Bank via the user's personal access token, syncs Spending-account transactions, and renders a mobile-first single-page dashboard showing whether the user is pacing ahead of or behind their target.
+A personal trip budget tracker for a year-long trip with an $80,000 AUD target, optimised for _underspending_. Connects to Up Bank via the user's personal access token, syncs Spending-account transactions, and renders a mobile-first single-page dashboard showing whether the user is pacing ahead of or behind their target.
 
 Designed for one-click deploy to the user's own Cloudflare account so other Up Bank customers can use it. Single-user per deployment; Cloudflare Access provides authentication (Up's terms forbid sharing a PAT).
 
@@ -122,33 +122,33 @@ up-travel/
 
 ### 6.1 Worker modules
 
-| Module | Purpose | Depends on |
-|---|---|---|
-| `up/client.ts` | Typed Up API wrapper: list txns with cursor pagination, list accounts, create/list/delete webhooks. 429 backoff. | `UP_API_TOKEN` |
-| `sync/` | Pull Up txns since watermark, filter to Spending account, classify transfers and ATM withdrawals, upsert into D1, advance watermark. Called from cron and webhook. | `up/client`, `db`, KV |
-| `fx/` | Get rate for `(date, currency → AUD)`. KV cache `fx:YYYY-MM-DD:<CCY>`. Walks back up to 7 days if today's rate not published. | KV, fawazahmed0 CDN |
-| `db/schema.ts` | Drizzle schema and migrations. | D1 |
-| `analytics/` | Re-exports pure functions from `@shared/analytics-core`. | shared |
-| `routes/api/trips` | CRUD trips, set active. | `db` |
-| `routes/api/transactions` | List/filter for active trip, toggle exclude. | `db`, `analytics` |
-| `routes/api/dashboard` | Aggregate query + analytics → dashboard payload. | `db`, `analytics` |
-| `routes/api/itinerary` | Parse, validate, replace itinerary entries. | `db` |
-| `routes/api/manual-entry` | Create/edit/delete cash entries with FX lookup. | `db`, `fx` |
-| `routes/api/settings` | Trip budget, dates, category targets. | `db` |
-| `routes/api/setup` | Idempotent webhook registration, KV secret storage. | `up/client`, KV |
-| `routes/webhook/up` | HMAC verify, trigger sync for affected txn. | KV, `sync` |
+| Module                    | Purpose                                                                                                                                                            | Depends on            |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| `up/client.ts`            | Typed Up API wrapper: list txns with cursor pagination, list accounts, create/list/delete webhooks. 429 backoff.                                                   | `UP_API_TOKEN`        |
+| `sync/`                   | Pull Up txns since watermark, filter to Spending account, classify transfers and ATM withdrawals, upsert into D1, advance watermark. Called from cron and webhook. | `up/client`, `db`, KV |
+| `fx/`                     | Get rate for `(date, currency → AUD)`. KV cache `fx:YYYY-MM-DD:<CCY>`. Walks back up to 7 days if today's rate not published.                                      | KV, fawazahmed0 CDN   |
+| `db/schema.ts`            | Drizzle schema and migrations.                                                                                                                                     | D1                    |
+| `analytics/`              | Re-exports pure functions from `@shared/analytics-core`.                                                                                                           | shared                |
+| `routes/api/trips`        | CRUD trips, set active.                                                                                                                                            | `db`                  |
+| `routes/api/transactions` | List/filter for active trip, toggle exclude.                                                                                                                       | `db`, `analytics`     |
+| `routes/api/dashboard`    | Aggregate query + analytics → dashboard payload.                                                                                                                   | `db`, `analytics`     |
+| `routes/api/itinerary`    | Parse, validate, replace itinerary entries.                                                                                                                        | `db`                  |
+| `routes/api/manual-entry` | Create/edit/delete cash entries with FX lookup.                                                                                                                    | `db`, `fx`            |
+| `routes/api/settings`     | Trip budget, dates, category targets.                                                                                                                              | `db`                  |
+| `routes/api/setup`        | Idempotent webhook registration, KV secret storage.                                                                                                                | `up/client`, KV       |
+| `routes/webhook/up`       | HMAC verify, trigger sync for affected txn.                                                                                                                        | KV, `sync`            |
 
 ### 6.2 Pages modules
 
-| Module | Purpose |
-|---|---|
-| `pages/Dashboard.tsx` | Single screen. Headline pace status, totals, daily allowance, today vs allowance, category progress, city breakdown, recent transactions with exclude toggle, manual-entry FAB. |
-| `pages/Trips.tsx` | List, create, switch active. |
-| `pages/Settings.tsx` | Budget, dates, category targets. |
-| `pages/Itinerary.tsx` | Paste/edit with live-parsed preview. |
-| `pages/History.tsx` | Archived trips, summary stats only. |
-| `lib/api.ts` | Typed fetch wrapper, shares types with Worker via `@shared/schemas`. |
-| `components/widgets/*` | `PaceCard`, `AllowanceCard`, `TodayCard`, `CategoryBars`, `CityStack`, `TrendChart`, `TxnRow`. |
+| Module                 | Purpose                                                                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pages/Dashboard.tsx`  | Single screen. Headline pace status, totals, daily allowance, today vs allowance, category progress, city breakdown, recent transactions with exclude toggle, manual-entry FAB. |
+| `pages/Trips.tsx`      | List, create, switch active.                                                                                                                                                    |
+| `pages/Settings.tsx`   | Budget, dates, category targets.                                                                                                                                                |
+| `pages/Itinerary.tsx`  | Paste/edit with live-parsed preview.                                                                                                                                            |
+| `pages/History.tsx`    | Archived trips, summary stats only.                                                                                                                                             |
+| `lib/api.ts`           | Typed fetch wrapper, shares types with Worker via `@shared/schemas`.                                                                                                            |
+| `components/widgets/*` | `PaceCard`, `AllowanceCard`, `TodayCard`, `CategoryBars`, `CityStack`, `TrendChart`, `TxnRow`.                                                                                  |
 
 ### 6.3 Shared package
 
@@ -220,19 +220,19 @@ category_budgets(
 
 ### 7.2 KV keys
 
-| Key | Value | TTL |
-|---|---|---|
-| `sync:watermark:<trip_id>` | ISO ts of latest Up `createdAt` processed | none |
-| `sync:status` | `{last_run, last_error, in_progress}` JSON | none |
-| `fx:<YYYY-MM-DD>:<CCY>` | AUD-per-1-CCY rate, with `actual_date` if walked back | none |
-| `up:webhook:id` | Up webhook id | none |
-| `up:webhook:secret` | Up-issued HMAC secret | none |
+| Key                        | Value                                                 | TTL  |
+| -------------------------- | ----------------------------------------------------- | ---- |
+| `sync:watermark:<trip_id>` | ISO ts of latest Up `createdAt` processed             | none |
+| `sync:status`              | `{last_run, last_error, in_progress}` JSON            | none |
+| `fx:<YYYY-MM-DD>:<CCY>`    | AUD-per-1-CCY rate, with `actual_date` if walked back | none |
+| `up:webhook:id`            | Up webhook id                                         | none |
+| `up:webhook:secret`        | Up-issued HMAC secret                                 | none |
 
 ### 7.3 ATM and manual-cash model
 
 - Up transactions are flagged `is_atm = 1` when Up's child category indicates cash withdrawal (primary signal: Up's `cash-withdrawals` child category; fallback: description regex such as `/\bATM\b|cash withdrawal/i`).
 - ATM transactions are real spend: `counts_as_spend = 1`. They appear in the dashboard's category breakdown under a dedicated "Cash" bucket.
-- Manual cash entries default to `counts_as_spend = 0` — they are *detail*, not double-counted spend. A per-entry toggle ("This is cash that didn't come from a tracked ATM withdrawal") flips them to `counts_as_spend = 1` (covers airport exchange, cash gift, etc.).
+- Manual cash entries default to `counts_as_spend = 0` — they are _detail_, not double-counted spend. A per-entry toggle ("This is cash that didn't come from a tracked ATM withdrawal") flips them to `counts_as_spend = 1` (covers airport exchange, cash gift, etc.).
 - The "Cash on hand" stat = sum(ATM-withdrawn) − sum(manual non-counting entries). Surfaced as a small widget on the dashboard.
 
 ## 8. Data flows
@@ -330,24 +330,24 @@ POST /api/setup
 
 ## 9. Error handling and resilience
 
-| Failure | Response |
-|---|---|
-| Up API 429 / 5xx | Exponential backoff (1s, 4s, 16s) up to 3 tries; persist `last_error`; succeed-quiet next cron. |
-| Up API down for hours | Cron keeps trying; dashboard shows "Synced 3h ago" so staleness is visible. |
-| Webhook HMAC fails | 401, log timestamp + IP. Never act on unverified payload. |
-| Webhook arrives mid-cron | Idempotent upsert on Up txn id. Either run wins. |
-| Up `HELD` → `SETTLED` change | Same id, upsert overwrites. `raw` JSON preserves prior state. |
-| FX rate not yet published | Walk back up to 7 days; cache entry records `actual_date` so UI can flag "rate from 14 May". |
-| fawazahmed0 CDN down | Two endpoints (jsdelivr + github.io). If both fail, store with `fx_pending`; cron retries conversion. |
-| D1 transient error | Drizzle retries once; surface to SPA with retry toast. |
-| User rotates Up PAT | Set new `UP_API_TOKEN` secret. Existing webhook secret unaffected. |
-| User deletes webhook in Up | Cron is the safety net. Re-running `POST /api/setup` re-registers. |
-| No txns yet | Dashboard zero state: budget + days remaining + daily allowance only. |
-| Past-dated trip start (backfill) | First sync uses `filter[since]=start_date`. Paginates fully. Used for Europe 2025 fixture replay. |
-| Two active trips | Partial unique index `WHERE is_active = 1` prevents. Set-active flips atomically. |
-| Webhook replay | HMAC + idempotent upsert make replay harmless. |
-| Eurozone ambiguity | Bucket as "Europe (unspecified)" until itinerary refines. Visible so user knows to fill in. |
-| Garbled itinerary paste | Parser returns per-line errors; nothing saved until clean. |
+| Failure                          | Response                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Up API 429 / 5xx                 | Exponential backoff (1s, 4s, 16s) up to 3 tries; persist `last_error`; succeed-quiet next cron.       |
+| Up API down for hours            | Cron keeps trying; dashboard shows "Synced 3h ago" so staleness is visible.                           |
+| Webhook HMAC fails               | 401, log timestamp + IP. Never act on unverified payload.                                             |
+| Webhook arrives mid-cron         | Idempotent upsert on Up txn id. Either run wins.                                                      |
+| Up `HELD` → `SETTLED` change     | Same id, upsert overwrites. `raw` JSON preserves prior state.                                         |
+| FX rate not yet published        | Walk back up to 7 days; cache entry records `actual_date` so UI can flag "rate from 14 May".          |
+| fawazahmed0 CDN down             | Two endpoints (jsdelivr + github.io). If both fail, store with `fx_pending`; cron retries conversion. |
+| D1 transient error               | Drizzle retries once; surface to SPA with retry toast.                                                |
+| User rotates Up PAT              | Set new `UP_API_TOKEN` secret. Existing webhook secret unaffected.                                    |
+| User deletes webhook in Up       | Cron is the safety net. Re-running `POST /api/setup` re-registers.                                    |
+| No txns yet                      | Dashboard zero state: budget + days remaining + daily allowance only.                                 |
+| Past-dated trip start (backfill) | First sync uses `filter[since]=start_date`. Paginates fully. Used for Europe 2025 fixture replay.     |
+| Two active trips                 | Partial unique index `WHERE is_active = 1` prevents. Set-active flips atomically.                     |
+| Webhook replay                   | HMAC + idempotent upsert make replay harmless.                                                        |
+| Eurozone ambiguity               | Bucket as "Europe (unspecified)" until itinerary refines. Visible so user knows to fill in.           |
+| Garbled itinerary paste          | Parser returns per-line errors; nothing saved until clean.                                            |
 
 **Logging**
 
@@ -450,7 +450,7 @@ On push/PR: install → typecheck → lint → test (unit + integration + scenar
 ## 12. Coding standards
 
 - TypeScript strict mode. No `any` outside explicit boundary types.
-- No code comments unless explaining a non-obvious *why*. Identifiers and tests document *what*.
+- No code comments unless explaining a non-obvious _why_. Identifiers and tests document _what_.
 - No em-dashes in code or docs (project preference).
 - Functions small, single-purpose. Pure where possible (especially `analytics-core`).
 - All boundary input validated by zod schemas before reaching business logic.
