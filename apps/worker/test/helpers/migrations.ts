@@ -3,7 +3,6 @@
 // Vite resolves the ?raw imports at transform time (in Node), so the SQL text
 // is embedded as a string constant and no fs calls happen at runtime.
 
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-expect-error — Vite ?raw imports are not typed by default
 import migration0001 from "../../migrations/0001_initial.sql?raw";
 
