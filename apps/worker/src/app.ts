@@ -6,6 +6,8 @@ import { dashboardRouter } from "./routes/dashboard";
 import { manualEntryRouter } from "./routes/manual-entry";
 import { itineraryRouter } from "./routes/itinerary";
 import { settingsRouter } from "./routes/settings";
+import { setupRouter } from "./routes/setup";
+import { webhookRouter } from "./routes/webhook";
 
 export const app = new Hono<{ Bindings: Env }>();
 app.get("/api/health", (c) => c.json({ ok: true }));
@@ -15,3 +17,5 @@ app.route("/api/dashboard", dashboardRouter);
 app.route("/api/manual-entry", manualEntryRouter);
 app.route("/api/itinerary", itineraryRouter);
 app.route("/api/settings", settingsRouter);
+app.route("/api/setup", setupRouter);
+app.route("/webhook", webhookRouter);
