@@ -18,13 +18,13 @@
   "dependencies": {
     "@up-travel/shared": "workspace:*",
     "hono": "4.6.5",
-    "drizzle-orm": "0.34.0",
+    "drizzle-orm": "0.36.4",
     "zod": "3.23.8"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.5.18",
     "@cloudflare/workers-types": "4.20241022.0",
-    "drizzle-kit": "0.26.2",
+    "drizzle-kit": "0.27.0",
     "vitest": "2.1.2",
     "wrangler": "3.81.0"
   }

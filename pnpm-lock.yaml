@@ -39,8 +39,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       drizzle-orm:
-        specifier: 0.34.0
-        version: 0.34.0(@cloudflare/workers-types@4.20241022.0)
+        specifier: 0.36.4
+        version: 0.36.4(@cloudflare/workers-types@4.20241022.0)
       hono:
         specifier: 4.6.5
         version: 4.6.5
@@ -55,8 +55,8 @@ importers:
         specifier: 4.20241022.0
         version: 4.20241022.0
       drizzle-kit:
-        specifier: 0.26.2
-        version: 0.26.2
+        specifier: 0.27.0
+        version: 0.27.0
       vitest:
         specifier: 2.1.2
         version: 2.1.2(@types/node@22.7.0)
@@ -1171,18 +1171,19 @@ packages:
   devalue@4.3.3:
     resolution: {integrity: sha512-UH8EL6H2ifcY8TbD2QsxwCC/pr5xSwPvv85LrLXVihmHVC3T3YqTCIwnR5ak0yO1KYqlxrPVOA/JVZJYPy2ATg==}
 
-  drizzle-kit@0.26.2:
-    resolution: {integrity: sha512-cMq8omEKywjIy5KcqUo6LvEFxkl8/zYHsgYjFVXjmPWWtuW4blcz+YW9+oIhoaALgs2ebRjzXwsJgN9i6P49Dw==}
+  drizzle-kit@0.27.0:
+    resolution: {integrity: sha512-vJJCPvKGLFcmOFBELKqcRng3Fc6qTOaKNAqetLEoysD7HjlSlJOWwM54FJlhpqA+cZcIdsL8r9/7v9JIFfs3MA==}
     hasBin: true
 
-  drizzle-orm@0.34.0:
-    resolution: {integrity: sha512-6l9v65YoCr53UOWjyPPNYYQsZYvtzgxMKxljQ5VlJcS3/zM81MXnWeSfqQFlrUHxoTNgyi9BWHysUE8+c0odzA==}
+  drizzle-orm@0.36.4:
+    resolution: {integrity: sha512-1OZY3PXD7BR00Gl61UUOFihslDldfH4NFRH2MbP54Yxi0G/PKn4HfO65JYZ7c16DeP3SpM3Aw+VXVG9j6CRSXA==}
     peerDependencies:
       '@aws-sdk/client-rds-data': '>=3'
       '@cloudflare/workers-types': '>=3'
-      '@electric-sql/pglite': '>=0.1.1'
+      '@electric-sql/pglite': '>=0.2.0'
       '@libsql/client': '>=0.10.0'
-      '@neondatabase/serverless': '>=0.1'
+      '@libsql/client-wasm': '>=0.10.0'
+      '@neondatabase/serverless': '>=0.10.0'
       '@op-engineering/op-sqlite': '>=2'
       '@opentelemetry/api': ^1.4.1
       '@planetscale/database': '>=1'
@@ -1196,7 +1197,7 @@ packages:
       '@xata.io/client': '*'
       better-sqlite3: '>=7'
       bun-types: '*'
-      expo-sqlite: '>=13.2.0'
+      expo-sqlite: '>=14.0.0'
       knex: '*'
       kysely: '*'
       mysql2: '>=2'
@@ -1214,6 +1215,8 @@ packages:
       '@electric-sql/pglite':
         optional: true
       '@libsql/client':
+        optional: true
+      '@libsql/client-wasm':
         optional: true
       '@neondatabase/serverless':
         optional: true
@@ -2703,7 +2706,7 @@ snapshots:
 
   devalue@4.3.3: {}
 
-  drizzle-kit@0.26.2:
+  drizzle-kit@0.27.0:
     dependencies:
       '@drizzle-team/brocli': 0.10.2
       '@esbuild-kit/esm-loader': 2.6.5
@@ -2712,7 +2715,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  drizzle-orm@0.34.0(@cloudflare/workers-types@4.20241022.0):
+  drizzle-orm@0.36.4(@cloudflare/workers-types@4.20241022.0):
     optionalDependencies:
       '@cloudflare/workers-types': 4.20241022.0
 

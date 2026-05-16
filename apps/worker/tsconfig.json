@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "types": ["@cloudflare/workers-types", "vitest/globals"],
+    "types": ["@cloudflare/workers-types", "vitest/globals", "@cloudflare/vitest-pool-workers"],
     "lib": ["ES2022"],
     "jsx": "preserve",
     "moduleResolution": "Bundler"
