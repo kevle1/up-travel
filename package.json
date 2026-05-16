@@ -9,6 +9,8 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "pnpm -r lint",
     "dev": "pnpm --parallel --filter './apps/*' dev",
+    "dev:worker": "pnpm --filter @up-travel/worker dev",
+    "dev:web": "pnpm --filter @up-travel/web dev",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
