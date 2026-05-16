@@ -4,7 +4,7 @@ import { aud, isoDay } from "../../lib/format";
 import { api, type RecentTxn } from "../../lib/api";
 
 export function TxnRow({ t }: { t: RecentTxn }) {
-  const [excluded, setExcluded] = useState(false);
+  const [excluded, setExcluded] = useState(t.excluded);
   const qc = useQueryClient();
   const m = useMutation({
     mutationFn: () => api.transactions.exclude(t.id, !excluded),

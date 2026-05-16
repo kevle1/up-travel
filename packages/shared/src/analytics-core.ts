@@ -21,11 +21,14 @@ import type { ItineraryEntry, Transaction } from "./schemas";
 
 const ABS = (n: number) => (n < 0 ? -n : n);
 
+// negative cents (spend) → positive total; positive cents (refund) → subtract
+const spendAmount = (cents: number): number => -cents;
+
 function countsAsSpend(t: Transaction, excluded: Set<string>): boolean {
   if (excluded.has(t.id)) return false;
   if (t.isTransfer) return false;
   if (!t.countsAsSpend) return false;
-  return t.amountAudCents < 0;
+  return true;
 }
 
 export function totals(txns: Transaction[], excluded: Set<string>): { spent: number } {
@@ -55,7 +58,7 @@ export function categoryProgress(
   for (const t of txns) {
     if (!countsAsSpend(t, excluded)) continue;
     const key = t.isAtm ? "cash" : (t.upCategoryParent ?? "uncategorised");
-    sums.set(key, (sums.get(key) ?? 0) + ABS(t.amountAudCents));
+    sums.set(key, (sums.get(key) ?? 0) + spendAmount(t.amountAudCents));
   }
   const keys = new Set<string>([...sums.keys(), ...budgets.keys()]);
   const rows: CategoryProgressRow[] = [];
@@ -116,7 +119,7 @@ export function groupByCity(
     } else {
       label = "Home (AU)";
     }
-    groups.set(label, (groups.get(label) ?? 0) + ABS(t.amountAudCents));
+    groups.set(label, (groups.get(label) ?? 0) + spendAmount(t.amountAudCents));
   }
   return [...groups.entries()].map(([label, spent]) => ({ label, spent }))
     .sort((a, b) => b.spent - a.spent);
@@ -142,7 +145,7 @@ export function dailyTrend(
   for (const t of txns) {
     if (!countsAsSpend(t, excluded)) continue;
     const day = isoDate(t.occurredAt);
-    by.set(day, (by.get(day) ?? 0) + ABS(t.amountAudCents));
+    by.set(day, (by.get(day) ?? 0) + spendAmount(t.amountAudCents));
   }
   const out: { date: string; spent: number }[] = [];
   let cursor = new Date(startDate + "T00:00:00Z");

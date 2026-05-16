@@ -146,6 +146,38 @@ describe("groupByCity", () => {
   });
 });
 
+describe("refund consistency", () => {
+  it("refunds reduce totals, categoryProgress, groupByCity, and dailyTrend consistently", () => {
+    const d = (iso: string) => Date.parse(iso + "T12:00:00Z");
+    const itin: ItineraryEntry[] = [
+      { id: 1, tripId: 1, startDate: "2026-06-01", endDate: "2026-06-10", city: "Tokyo", country: "JP" },
+    ];
+    const txns = [
+      tx({ amountAudCents: -5000, upCategoryParent: "good-life", occurredAt: d("2026-06-05") }),
+      tx({ amountAudCents: 2000, upCategoryParent: "good-life", occurredAt: d("2026-06-05") }),
+    ];
+    const excluded = new Set<string>();
+
+    // totals: 5000 spend - 2000 refund = 3000
+    const { spent } = totals(txns, excluded);
+    expect(spent).toBe(3000);
+
+    // categoryProgress: net 3000 in good-life
+    const catRows = categoryProgress(txns, excluded, new Map());
+    const gl = catRows.find((r) => r.categoryKey === "good-life")!;
+    expect(gl.spent).toBe(3000);
+
+    // groupByCity: net 3000 in Tokyo
+    const cityRows = groupByCity(txns, excluded, itin);
+    expect(cityRows.find((g) => g.label === "Tokyo, JP")?.spent).toBe(3000);
+
+    // dailyTrend: net 3000 on that day
+    const trend = dailyTrend(txns, excluded, "2026-06-05", "2026-06-05");
+    expect(trend).toHaveLength(1);
+    expect(trend[0]!.spent).toBe(3000);
+  });
+});
+
 describe("cashOnHand", () => {
   it("ATM withdrawals minus non-counting manual entries", () => {
     const txns = [

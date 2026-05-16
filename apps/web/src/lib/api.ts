@@ -89,6 +89,7 @@ export interface RecentTxn {
   foreignCurrency: string | null;
   isAtm: boolean;
   source: "up" | "manual";
+  excluded: boolean;
 }
 export interface DashboardPayload {
   trip: {

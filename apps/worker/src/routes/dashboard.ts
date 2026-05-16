@@ -51,11 +51,16 @@ dashboardRouter.get("/", async (c) => {
   const itinerary: ItineraryEntry[] = itin.map((e) => ({ ...e }));
 
   const today = new Date().toISOString().slice(0, 10);
+  // Open-ended trips default to a 365-day projection horizon.
   const startEpoch = Date.parse(`${trip.startDate}T00:00:00Z`);
-  const endIso = trip.endDate ?? today;
-  const totalDays = Math.max(1, Math.ceil((Date.parse(`${endIso}T23:59:59Z`) - startEpoch) / 86_400_000));
-  const daysElapsed = Math.max(0, Math.min(totalDays,
-    Math.ceil((Date.parse(`${today}T23:59:59Z`) - startEpoch) / 86_400_000)));
+  const todayEpoch = Date.parse(`${today}T23:59:59Z`);
+  const explicitEndEpoch = trip.endDate ? Date.parse(`${trip.endDate}T23:59:59Z`) : null;
+  const defaultEndEpoch = startEpoch + 365 * 86_400_000;
+  const endEpoch = explicitEndEpoch ?? defaultEndEpoch;
+  const endIso = trip.endDate ?? new Date(defaultEndEpoch).toISOString().slice(0, 10);
+
+  const totalDays = Math.max(1, Math.ceil((endEpoch - startEpoch) / 86_400_000));
+  const daysElapsed = Math.max(0, Math.min(totalDays, Math.ceil((todayEpoch - startEpoch) / 86_400_000)));
   const daysLeft = Math.max(0, totalDays - daysElapsed);
 
   const { spent } = totals(txns, excluded);
@@ -82,6 +87,18 @@ dashboardRouter.get("/", async (c) => {
     recent: txns
       .filter((t) => !t.isTransfer)
       .sort((a, b) => b.occurredAt - a.occurredAt)
-      .slice(0, 20),
+      .slice(0, 20)
+      .map((t) => ({
+        id: t.id,
+        occurredAt: t.occurredAt,
+        amountAudCents: t.amountAudCents,
+        description: t.description,
+        upCategoryParent: t.upCategoryParent,
+        foreignAmount: t.foreignAmount,
+        foreignCurrency: t.foreignCurrency,
+        isAtm: t.isAtm,
+        source: t.source,
+        excluded: excluded.has(t.id),
+      })),
   });
 });
