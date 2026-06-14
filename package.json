@@ -1,0 +1,28 @@
+{
+  "name": "up-travel",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@9.0.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "dev": "pnpm --parallel --filter \"./apps/**\" dev",
+    "dev:host": "pnpm --parallel --filter \"./apps/**\" dev:host",
+    "dev:worker": "pnpm --filter @up-travel/worker dev",
+    "dev:web": "pnpm --filter @up-travel/web dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "9.13.0",
+    "@types/node": "22.7.0",
+    "@typescript-eslint/eslint-plugin": "8.8.0",
+    "@typescript-eslint/parser": "8.8.0",
+    "eslint": "9.13.0",
+    "eslint-config-prettier": "9.1.0",
+    "prettier": "3.3.3",
+    "typescript": "5.6.3"
+  }
+}
