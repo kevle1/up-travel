@@ -8,8 +8,8 @@
     "dev": "node -e \"require('node:fs').mkdirSync('../web/dist',{recursive:true})\" && wrangler dev --config ../../wrangler.jsonc",
     "dev:host": "node -e \"require('node:fs').mkdirSync('../web/dist',{recursive:true})\" && wrangler dev --config ../../wrangler.jsonc --ip 0.0.0.0",
     "deploy": "wrangler deploy --config ../../wrangler.jsonc",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "node -e \"require('node:fs').mkdirSync('../web/dist',{recursive:true})\" && vitest run",
+    "test:watch": "node -e \"require('node:fs').mkdirSync('../web/dist',{recursive:true})\" && vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src test"
   },

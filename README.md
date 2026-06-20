@@ -40,7 +40,7 @@ At the top: how much you've spent today and your 7-day average, each labelled gr
 
 Below that: how much you're banked (or behind), how much budget is left, where today's spend went by category, a 30-day sparkline, and your **money runway**, how many days your remaining budget lasts at your current pace vs how many days are left in the trip.
 
-When a trip's over, the a summary view is shown
+When a trip's over, a summary view is shown
 
 ### Trends
 
