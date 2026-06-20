@@ -1,0 +1,44 @@
+// Repo-root wrangler config so the "Deploy to Cloudflare" button finds it
+// without any monorepo path gymnastics. The D1 + KV bindings deliberately
+// omit IDs - wrangler 4 auto-provisions them on first deploy in the
+// deployer's Cloudflare account (the schema itself is created by the worker
+// on the first request via apps/worker/src/db/migrate.ts).
+{
+  "$schema": "apps/worker/node_modules/wrangler/config-schema.json",
+  "name": "up-travel",
+  "main": "apps/worker/src/index.ts",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "up-travel"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV"
+    }
+  ],
+  "assets": {
+    "directory": "apps/web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+  "vars": {
+    "UP_API_BASE": "https://api.up.com.au/api/v1"
+  },
+  "dev": {
+    "port": 8787
+  },
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true
+    }
+  }
+}

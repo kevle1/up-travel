@@ -46,7 +46,7 @@ export function BurnChart({
   const n = data.length;
   // Slot-based x: each point sits at the centre of its own slot rather than
   // at the viewBox edges. Otherwise the first and last bars hang half off
-  // the chart and look like they're missing (issue at low N — e.g. 3 days
+  // the chart and look like they're missing (issue at low N - e.g. 3 days
   // showed only 2 bars because the edge ones were clipped by the SVG).
   const slot = iw / n;
   const x = (i: number) => padL + slot * (i + 0.5);

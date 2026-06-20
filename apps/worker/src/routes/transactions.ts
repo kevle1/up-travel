@@ -8,7 +8,7 @@ import type { Env } from "../env";
 
 export const transactionsRouter = new Hono<{ Bindings: Env }>();
 
-// PATCH /api/transactions/:id  — upsert per-trip override.
+// PATCH /api/transactions/:id  - upsert per-trip override.
 // Body: { travelCategory?, stayId?, excluded?, notes? }  (set null to clear)
 transactionsRouter.patch("/:id", async (c) => {
   const txnId = c.req.param("id");
@@ -17,7 +17,7 @@ transactionsRouter.patch("/:id", async (c) => {
   if (tripId == null) return c.json({ error: "no active trip" }, 400);
   const db = drizzle(c.env.DB);
 
-  // Build an upsert row. Fields not in body default to "leave alone" — we read
+  // Build an upsert row. Fields not in body default to "leave alone" - we read
   // any existing row and merge so partial patches preserve other fields.
   const [existing] = await db.select().from(transactionOverrides)
     .where(eq(transactionOverrides.txnId, txnId));

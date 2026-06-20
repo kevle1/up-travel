@@ -52,7 +52,7 @@ describe("paceStatus", () => {
   });
 });
 
-describe("buildBurn — base case", () => {
+describe("buildBurn - base case", () => {
   const trip = makeTrip();
   const txns: Transaction[] = [
     tx({ id: "a", occurredAt: ms("2025-09-03"), amountAudCents: -50_00 }), // A$50 day 1
@@ -86,7 +86,7 @@ describe("buildBurn — base case", () => {
   });
 });
 
-describe("buildBurn — excludes transfers and ATM top-ups from burn", () => {
+describe("buildBurn - excludes transfers and ATM top-ups from burn", () => {
   const trip = makeTrip();
   const txns: Transaction[] = [
     tx({ id: "spend", occurredAt: ms("2025-09-03"), amountAudCents: -50_00 }),
@@ -109,7 +109,7 @@ describe("buildBurn — excludes transfers and ATM top-ups from burn", () => {
   });
 });
 
-describe("buildBurn — travel category override wins over Up's default", () => {
+describe("buildBurn - travel category override wins over Up's default", () => {
   const trip = makeTrip();
   const txns: Transaction[] = [
     // Up tagged it "Hobbies" → would default to "sights"
@@ -130,14 +130,14 @@ describe("buildBurn — travel category override wins over Up's default", () => 
   });
 });
 
-describe("buildBurn — accommodation amortisation", () => {
+describe("buildBurn - accommodation amortisation", () => {
   const trip = makeTrip();
   // Stay: 8 nights starting day 1
   const stays: Stay[] = [{
     id: 100, tripId: 1, name: "Lisbon stay", city: "Lisbon",
     checkIn: "2025-09-03", nights: 8,
   }];
-  // Two payments totalling A$800 — should spread to A$100/night
+  // Two payments totalling A$800 - should spread to A$100/night
   const txns: Transaction[] = [
     tx({ id: "deposit", occurredAt: ms("2025-08-20"), amountAudCents: -200_00 }), // deposit (before trip; still linked)
     tx({ id: "balance", occurredAt: ms("2025-09-03"), amountAudCents: -600_00 }),
@@ -177,7 +177,7 @@ describe("buildBurn — accommodation amortisation", () => {
   });
 });
 
-describe("buildBurn — cash float", () => {
+describe("buildBurn - cash float", () => {
   const trip = makeTrip();
   const cashLogs: CashLog[] = [
     { id: "spend1", tripId: 1, kind: "spend", occurredAt: ms("2025-09-03"), amountAudCents: 30_00, foreignAmount: null, foreignCurrency: null, travelCategory: "food", isCash: true, city: null, note: "coffee" },
@@ -205,7 +205,7 @@ describe("buildBurn — cash float", () => {
   });
 });
 
-describe("buildBurn — completed trip", () => {
+describe("buildBurn - completed trip", () => {
   const trip = makeTrip({ startDate: "2025-09-03", endDate: "2025-09-05" });
   const txns: Transaction[] = [
     tx({ id: "a", occurredAt: ms("2025-09-03"), amountAudCents: -100_00 }),
@@ -226,7 +226,7 @@ describe("buildBurn — completed trip", () => {
   });
 });
 
-describe("buildBurn — feed clamps to trip window", () => {
+describe("buildBurn - feed clamps to trip window", () => {
   const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-11-06" });
   const txns: Transaction[] = [
     tx({ id: "before", occurredAt: ms("2025-08-15"), amountAudCents: -50_00 }),
@@ -258,7 +258,7 @@ describe("buildBurn — feed clamps to trip window", () => {
   });
 });
 
-describe("buildBurn — spreadDays amortises across N days", () => {
+describe("buildBurn - spreadDays amortises across N days", () => {
   const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-10" });
   // A$100 transit pass on day 1, marked to spread across 5 days.
   const txns: Transaction[] = [
@@ -285,15 +285,15 @@ describe("buildBurn — spreadDays amortises across N days", () => {
   });
 });
 
-describe("buildBurn — incoming funds: shown in feed, opt-in to count", () => {
+describe("buildBurn - incoming funds: shown in feed, opt-in to count", () => {
   const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-30" });
   const txns: Transaction[] = [
     tx({ id: "spend", occurredAt: ms("2025-09-05"), amountAudCents: -120_00 }),
-    // Inter-account transfer — still hidden.
+    // Inter-account transfer - still hidden.
     tx({ id: "xfer-in", occurredAt: ms("2025-09-06"), amountAudCents: 500_00, isTransfer: true }),
-    // Salary deposit — now shown in feed but does not count toward burn.
+    // Salary deposit - now shown in feed but does not count toward burn.
     tx({ id: "salary", occurredAt: ms("2025-09-07"), amountAudCents: 5000_00 }),
-    // Refund — same default.
+    // Refund - same default.
     tx({ id: "refund", occurredAt: ms("2025-09-08"), amountAudCents: 30_00 }),
   ];
 
@@ -331,7 +331,7 @@ describe("buildBurn — incoming funds: shown in feed, opt-in to count", () => {
   });
 });
 
-describe("buildBurn — foreign amount is positive in the feed", () => {
+describe("buildBurn - foreign amount is positive in the feed", () => {
   const trip = makeTrip();
   const txns: Transaction[] = [
     // Spend of A$200 = USD -142.30 (signed) in major units
@@ -348,7 +348,7 @@ describe("buildBurn — foreign amount is positive in the feed", () => {
   });
 });
 
-describe("buildBurn — excluded transactions vanish from burn", () => {
+describe("buildBurn - excluded transactions vanish from burn", () => {
   const trip = makeTrip();
   const txns: Transaction[] = [
     tx({ id: "real", occurredAt: ms("2025-09-03"), amountAudCents: -50_00 }),

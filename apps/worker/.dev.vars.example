@@ -1,1 +1,4 @@
-UP_API_TOKEN=up:yeah:replace_me_with_your_pat
+# Optional. If empty, the worker generates a cookie signing key at Setup and
+# stores it in KV. Set this only if you want the key out of KV (e.g. to share
+# the same KV across local + prod without sharing session validity).
+# AUTH_COOKIE_SECRET=

@@ -3,18 +3,44 @@ import type {
   TransactionPatch, CashLog, CashLogCreate,
 } from "@up-travel/shared";
 
+export class HttpError extends Error {
+  constructor(public status: number, public body: string) {
+    super(`${status}: ${body}`);
+  }
+}
+
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     credentials: "same-origin",
     ...init,
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
-  if (!res.ok) throw new Error(`${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new HttpError(res.status, await res.text());
   return (await res.json()) as T;
+}
+
+export interface AuthMe {
+  authed: boolean;
+  setupRequired: boolean;
 }
 
 export const api = {
   health: () => http<{ ok: boolean }>("/api/health"),
+  auth: {
+    me: () => http<AuthMe>("/api/auth/me"),
+    login: (password: string) =>
+      http<{ ok: true }>("/api/auth/login", { method: "POST", body: JSON.stringify({ password }) }),
+    logout: () =>
+      http<{ ok: true }>("/api/auth/logout", { method: "POST" }),
+  },
+  setup: {
+    init: (password: string, upToken: string) =>
+      http<{ ok: true }>("/api/setup", {
+        method: "POST", body: JSON.stringify({ password, upToken }),
+      }),
+    reset: () =>
+      http<{ ok: true }>("/api/setup/reset", { method: "POST" }),
+  },
   burn: (tripId?: number) =>
     http<BurnState>(`/api/burn${tripId != null ? `?tripId=${tripId}` : ""}`),
   trips: {

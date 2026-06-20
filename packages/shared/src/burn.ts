@@ -137,7 +137,7 @@ export interface BurnState {
   cashFloat: number; // dollars
   cityByDay: Record<string, { city: string }>;
   catBreakdownToday: CatBreakdownView;
-  /** Keyed by window: "3", "7", "14", "30", "all" — the cat breakdown for that span ending at asOf. */
+  /** Keyed by window: "3", "7", "14", "30", "all" - the cat breakdown for that span ending at asOf. */
   catBreakdownByWindow: Record<CatWindow, CatBreakdownView>;
   stays: StayView[];
   feed: FeedRow[];
@@ -352,7 +352,7 @@ export function buildBurn(input: BurnInput): BurnState {
   // ── Feed (Spend tab) ───────────────────────────────────────────────────────
   // Clamp to the trip window. Stay-linked transactions kept regardless so a
   // pre-trip deposit still appears. Transfers (Up's internal account-to-
-  // account moves) stay hidden — they're not real spend or income. Incoming
+  // account moves) stay hidden - they're not real spend or income. Incoming
   // amounts (refunds, salary, deposits) are shown so the user can see them
   // and optionally toggle "count as credit" to apply them against burn.
   const feed: FeedRow[] = [];

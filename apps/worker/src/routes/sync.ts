@@ -1,21 +1,23 @@
 import { Hono } from "hono";
 import { runSync } from "../sync/run";
 import { UpClient } from "../up/client";
+import { getUpToken } from "../up/token";
 import { activeTripId } from "./trips";
 import type { Env } from "../env";
 
 export const syncRouter = new Hono<{ Bindings: Env }>();
 
-// POST /api/sync — manually trigger a sync for the active trip.
+// POST /api/sync - manually trigger a sync for the active trip.
 // Useful in local dev (where cron + webhooks don't fire) and as a "pull now"
 // button when you want fresh data without waiting for the hourly cron.
 //
-// Body (optional): { reset?: boolean }  — if true, clears the KV watermark
+// Body (optional): { reset?: boolean }  - if true, clears the KV watermark
 // first so the sync re-reads everything back to the trip start date.
 syncRouter.post("/", async (c) => {
   const tripId = await activeTripId(c.env.DB);
   if (tripId == null) return c.json({ error: "no active trip" }, 400);
-  if (!c.env.UP_API_TOKEN) return c.json({ error: "UP_API_TOKEN not configured" }, 500);
+  const token = await getUpToken(c.env.KV);
+  if (!token) return c.json({ error: "Up PAT not configured" }, 500);
 
   let reset = false;
   try {
@@ -29,7 +31,7 @@ syncRouter.post("/", async (c) => {
     await c.env.KV.delete(`sync:watermark:${tripId}`);
   }
 
-  const up = new UpClient({ token: c.env.UP_API_TOKEN, base: c.env.UP_API_BASE });
+  const up = new UpClient({ token, base: c.env.UP_API_BASE });
   try {
     const result = await runSync({ db: c.env.DB, kv: c.env.KV, up, tripId });
     return c.json({ ok: true, processed: result.processed });
@@ -42,7 +44,7 @@ syncRouter.post("/", async (c) => {
   }
 });
 
-// GET /api/sync/status — what does the last sync look like?
+// GET /api/sync/status - what does the last sync look like?
 syncRouter.get("/status", async (c) => {
   const tripId = await activeTripId(c.env.DB);
   const watermark = tripId != null ? await c.env.KV.get(`sync:watermark:${tripId}`) : null;

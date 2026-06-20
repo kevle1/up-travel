@@ -13,7 +13,7 @@ export const trips = sqliteTable("trips", {
   createdAt: integer("created_at").notNull(),
   archivedAt: integer("archived_at"),
 }, (t) => ({
-  // Only one active trip — partial index enforces it.
+  // Only one active trip - partial index enforces it.
   oneActive: uniqueIndex("trips_one_active").on(t.isActive).where(sql`${t.isActive} = 1`),
 }));
 
@@ -67,7 +67,7 @@ export const stays = sqliteTable("stays", {
   tripIdx: index("stays_trip").on(t.tripId, t.checkIn),
 }));
 
-// User-logged cash entries — spend (draws float, counts as burn) or topup
+// User-logged cash entries - spend (draws float, counts as burn) or topup
 // (adds to float, doesn't count as burn until spent).
 export const cashLogs = sqliteTable("cash_logs", {
   id: text("id").primaryKey(),

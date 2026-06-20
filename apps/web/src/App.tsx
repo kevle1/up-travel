@@ -8,6 +8,8 @@ import { Trends } from "./pages/Trends";
 import { Spend } from "./pages/Spend";
 import { Stays } from "./pages/Stays";
 import { Cash } from "./pages/Cash";
+import { Setup } from "./pages/Setup";
+import { Login } from "./pages/Login";
 import type { ChartStyle } from "./components/charts";
 import { Card } from "./components/ui";
 import { SyncButton } from "./components/SyncButton";
@@ -29,9 +31,30 @@ const TABS: { id: TabId; label: string; icon: string }[] = [
 export function App() {
   return (
     <SheetProvider>
-      <Shell />
+      <AuthGate />
     </SheetProvider>
   );
+}
+
+function AuthGate() {
+  const meQ = useQuery({
+    queryKey: ["auth", "me"],
+    queryFn: () => api.auth.me(),
+    retry: false,
+    staleTime: 60_000,
+  });
+  if (meQ.isLoading) {
+    return <div style={{ color: "var(--ink-3)", padding: 18 }}>Loading…</div>;
+  }
+  if (meQ.error || !meQ.data) {
+    // Treat any error here as "show login" - the auth/me endpoint should
+    // basically always respond; if it doesn't, the user can still try logging
+    // in and get a real error message there.
+    return <Login />;
+  }
+  if (meQ.data.setupRequired) return <Setup />;
+  if (!meQ.data.authed) return <Login />;
+  return <Shell />;
 }
 
 function Shell() {
@@ -48,7 +71,7 @@ function Shell() {
   const noTripYet = burnQ.error?.message.startsWith("404");
 
   // Background sync once the user has a trip and the app is open. Watermark-
-  // based, so it just asks Up "what's new since last time" — cheap. Guarded
+  // based, so it just asks Up "what's new since last time" - cheap. Guarded
   // by a ref so it only fires once per page load.
   const autoSync = useMutation({
     mutationFn: () => api.sync.run(false),
@@ -93,7 +116,7 @@ function Shell() {
     <div className="app">
       <div className="app__scroll">
         <div className="app__header">
-          <div className="app__title"><strong>Up Travel</strong> Spend Tracker</div>
+          <div className="app__title"><strong>Up</strong> Travel Budget Tracker</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             {!noTripYet && <SyncButton />}
             {!noTripYet && <ExportButton />}
@@ -146,6 +169,24 @@ function SettingsButton({
 }) {
   const [open, setOpen] = useState(false);
   const { mode, setMode } = useTheme();
+  const qc = useQueryClient();
+
+  const logout = useMutation({
+    mutationFn: () => api.auth.logout(),
+    onSettled: () => { qc.clear(); qc.invalidateQueries({ queryKey: ["auth", "me"] }); },
+  });
+
+  const resetSetup = useMutation({
+    mutationFn: () => api.setup.reset(),
+    onSettled: () => { qc.clear(); qc.invalidateQueries({ queryKey: ["auth", "me"] }); },
+  });
+
+  const askReset = () => {
+    if (confirm("Reset setup? This wipes the saved password and Up token. Trip data stays.")) {
+      resetSetup.mutate();
+    }
+  };
+
   return (
     <div style={{ position: "relative" }}>
       <button onClick={() => setOpen((v) => !v)} type="button" style={{
@@ -176,9 +217,23 @@ function SettingsButton({
               options={[{ value: "bars", label: "Bars" }, { value: "area", label: "Area" }, { value: "line", label: "Line" }]}
             />
           </Row>
+          <MenuRow onClick={() => logout.mutate()}>Sign out</MenuRow>
+          <MenuRow onClick={askReset} danger>Reset setup…</MenuRow>
         </div>
       )}
     </div>
+  );
+}
+
+function MenuRow({ children, onClick, danger }: { children: ReactNode; onClick: () => void; danger?: boolean }) {
+  return (
+    <button type="button" onClick={onClick} style={{
+      display: "block", width: "100%", textAlign: "left",
+      border: 0, background: "transparent", cursor: "pointer",
+      padding: "10px 0 8px", fontSize: 13, fontWeight: 600,
+      color: danger ? "var(--over)" : "var(--ink-2)",
+      borderTop: "0.5px solid var(--line)",
+    }}>{children}</button>
   );
 }
 

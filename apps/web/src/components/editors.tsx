@@ -237,7 +237,7 @@ function AccomBadge({ tx }: { tx: FeedRow }) {
   const { data: burn } = useQuery({ queryKey: ["burn"], queryFn: () => api.burn() });
   const stay = burn?.stays.find((s) => s.id === tx.stayId);
   // Unlink this tx. If it was the only payment linked to the stay, the stay
-  // is now empty — delete it so it doesn't linger as a phantom nights block.
+  // is now empty - delete it so it doesn't linger as a phantom nights block.
   // If other payments are still linked, leave the stay in place.
   const unlink = useMutation({
     mutationFn: async () => {
@@ -458,7 +458,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 // ── Spend logger ──────────────────────────────────────────────────────────────
-// Generic manual spend entry. AUD only by design — covers paid-in-cash spends,
+// Generic manual spend entry. AUD only by design - covers paid-in-cash spends,
 // reimbursements Up didn't see, split bills, etc. "Paid in cash" toggle draws
 // the spend from the cash float (which Up-sourced ATM withdrawals fill).
 export function SpendLogger() {

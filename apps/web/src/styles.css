@@ -1,28 +1,28 @@
-/* Design tokens. Background sits in the F8F6F1 family; cards push to pure
-   white so they lift cleanly. Status/category colours are saturated rather
-   than pastel so the breakdowns read at a glance. */
+/* Design tokens. Light mode is a cool slate-grey family - background sits
+   one notch below white so cards lift cleanly. Status/category colours are
+   saturated rather than pastel so the breakdowns read at a glance. */
 :root {
   --sans: 'Geist', system-ui, -apple-system, sans-serif;
   --mono: 'Geist Mono', ui-monospace, 'SF Mono', monospace;
   --accent: #FF705C;
   --accent-wash: #FF705C22;
-  --stage: #14110D;
+  --stage: #0B1220;
 }
 [data-theme="dark"] {
   --stage: #0E0E15;
 }
 :root, [data-theme="light"] {
-  --bg: #F8F6F1;
+  --bg: #F4F6FA;
   --surface: #FFFFFF;
-  --surface-2: #F2EFE9;        /* slightly recessed (chips, ring tracks) */
-  --ink: #14110D;
-  --ink-2: #585348;
-  --ink-3: #8B8377;
-  --line: rgba(20,17,13,.09);
-  --chip: rgba(20,17,13,.05);
-  --bar: rgba(248,246,241,.88);
-  --shadow: 0 1px 2px rgba(20,17,13,.04), 0 6px 18px rgba(20,17,13,.06);
-  --ring-track: rgba(20,17,13,.09);
+  --surface-2: #EBEEF4;        /* slightly recessed (chips, ring tracks) */
+  --ink: #0F172A;
+  --ink-2: #475569;
+  --ink-3: #94A3B8;
+  --line: rgba(15,23,42,.08);
+  --chip: rgba(15,23,42,.04);
+  --bar: rgba(244,246,250,.85);
+  --shadow: 0 1px 2px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
+  --ring-track: rgba(15,23,42,.08);
 
   /* vivid pacing colours */
   --good: #1F9A4D;
@@ -123,6 +123,23 @@ strong { font-weight: 600; }
 input, select, textarea, button {
   font-family: var(--sans);
   color: var(--ink);
+}
+
+/* Setup / Login form rows. */
+.field input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface-2);
+  border: 0.5px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.field input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-wash);
 }
 
 /* .app uses an exact-height flex column so the body itself never scrolls.

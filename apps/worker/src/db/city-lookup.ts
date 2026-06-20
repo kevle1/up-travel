@@ -8,7 +8,7 @@ export type CityLookup = (occurredAtMs: number) => string | null;
 const MS_DAY = 86_400_000;
 
 /** Build a per-trip city lookup. Fetches stays once and returns a fast O(n)
- *  function — n is the number of stays which is tiny (handfuls per trip), so
+ *  function - n is the number of stays which is tiny (handfuls per trip), so
  *  this is cheap enough to call once at the top of sync or a cash-log POST. */
 export async function buildCityLookup(d1: D1Database, tripId: number): Promise<CityLookup> {
   const db = drizzle(d1);

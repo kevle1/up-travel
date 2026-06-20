@@ -4,9 +4,9 @@ export default defineWorkersConfig({
   test: {
     poolOptions: {
       workers: {
-        wrangler: { configPath: "./wrangler.jsonc" },
+        wrangler: { configPath: "../../wrangler.jsonc" },
         miniflare: {
-          compatibilityDate: "2025-01-15",
+          compatibilityDate: "2026-05-01",
           compatibilityFlags: ["nodejs_compat"],
         },
       },

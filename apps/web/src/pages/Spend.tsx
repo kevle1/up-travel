@@ -92,7 +92,7 @@ export function Spend({ burn }: { burn: BurnState }) {
 }
 
 // Build the row's metadata line as a parts array so we can join with dots
-// only *between* items — avoids the leading-dot bug when an earlier field
+// only *between* items - avoids the leading-dot bug when an earlier field
 // (e.g. method) isn't present. Title-cased labels too.
 function MetaLine({ x, isTopup }: { x: FeedRow; isTopup: boolean }) {
   const parts: { text: string; color?: string }[] = [];
