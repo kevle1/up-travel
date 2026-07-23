@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@up-travel/shared": "workspace:*",
-    "hono": "4.6.5",
+    "hono": "4.12.27",
     "drizzle-orm": "0.36.4",
     "zod": "3.23.8"
   },
