@@ -17,7 +17,9 @@ export const trips = sqliteTable("trips", {
   oneActive: uniqueIndex("trips_one_active").on(t.isActive).where(sql`${t.isActive} = 1`),
 }));
 
-// Up-sourced source of truth. Manual entries live in cash_logs instead.
+// Every spend the app knows about. source:"up" rows come from sync and are
+// re-created on each run; source:"manual" rows were logged by hand and are the
+// user's to delete. Both get the same overrides, stay links and spreads.
 export const transactions = sqliteTable("transactions", {
   id: text("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
@@ -30,6 +32,8 @@ export const transactions = sqliteTable("transactions", {
   upCategoryParent: text("up_category_parent"),
   upCategoryChild: text("up_category_child"),
   cardPurchaseMethod: text("card_purchase_method"), // e.g. CONTACTLESS, ECOMMERCE, ATM
+  // Manual rows only. "cash" is the one that draws down the cash float.
+  paymentMethod: text("payment_method", { enum: ["cash", "card", "other"] }),
   city: text("city"),
   isTransfer: integer("is_transfer").notNull().default(0),
   isAtm: integer("is_atm").notNull().default(0),
@@ -67,8 +71,10 @@ export const stays = sqliteTable("stays", {
   tripIdx: index("stays_trip").on(t.tripId, t.checkIn),
 }));
 
-// User-logged cash entries - spend (draws float, counts as burn) or topup
-// (adds to float, doesn't count as burn until spent).
+// Legacy home for user-logged spends and ATM top-ups. Superseded by
+// source:"manual" transactions; ensureSchema() copies these across once and
+// nothing reads the table afterwards. Kept so the old rows survive the move,
+// and so deleting a trip still cleans them up.
 export const cashLogs = sqliteTable("cash_logs", {
   id: text("id").primaryKey(),
   tripId: integer("trip_id").notNull().references(() => trips.id),
@@ -84,3 +90,9 @@ export const cashLogs = sqliteTable("cash_logs", {
 }, (t) => ({
   tripTime: index("cash_logs_trip_time").on(t.tripId, t.occurredAt),
 }));
+
+// Applied data migrations, one row each. See db/migrate.ts.
+export const migrations = sqliteTable("migrations", {
+  id: text("id").primaryKey(),
+  appliedAt: integer("applied_at").notNull(),
+});

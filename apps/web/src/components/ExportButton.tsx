@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { travelLabel, upLabel } from "@up-travel/shared";
+import { paymentLabel, travelLabel, upLabel } from "@up-travel/shared";
 import { api } from "../lib/api";
 import { fmtMethod } from "../lib/format";
 import { Icon } from "./Icon";
@@ -22,9 +22,9 @@ export function ExportButton() {
     const stayById = new Map(burn.stays.map((s) => [s.id, s]));
     const header = [
       "date", "description", "amount_aud", "foreign_amount", "foreign_currency",
-      "travel_category", "up_category", "method", "city", "kind",
+      "travel_category", "up_category", "method", "city", "source",
       "is_accom", "stay_id", "stay_nights",
-      "excluded", "incoming", "spread_days", "is_cash", "notes",
+      "excluded", "incoming", "spread_days", "payment_method", "is_cash", "notes",
     ];
     const rows = burn.feed.map((r) => {
       const stay = r.stayId != null ? stayById.get(r.stayId) : undefined;
@@ -36,16 +36,17 @@ export function ExportButton() {
         r.foreign ? r.foreign.currencyCode : "",
         travelLabel(r.category),
         upLabel(r.upTag),
-        fmtMethod(r.method) ?? "",
+        fmtMethod(r.method) ?? paymentLabel(r.paymentMethod) ?? "",
         r.city ?? "",
-        r.kind,
+        r.source,
         r.isAccom ? "yes" : "",
         r.stayId ?? "",
         stay?.nights ?? "",
         r.excluded ? "yes" : "",
         r.incoming ? (r.countsAsCredit ? "credit" : "yes") : "",
         r.spreadDays ?? "",
-        r.kind === "cashlog" && r.isCash ? "yes" : "",
+        r.paymentMethod ?? "",
+        r.isCash ? "yes" : "",
         r.notes ?? "",
       ];
     });

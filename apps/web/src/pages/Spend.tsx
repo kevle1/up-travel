@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { TRAVEL_CATEGORIES, travelColor, travelLabel, type BurnState, type FeedRow } from "@up-travel/shared";
+import { TRAVEL_CATEGORIES, paymentLabel, travelColor, travelLabel, type BurnState, type FeedRow } from "@up-travel/shared";
 import { Card, Num } from "../components/ui";
 import { CategoryIcon } from "../components/CategoryIcon";
 import { Icon } from "../components/Icon";
-import { TxEditor, CashLogEditor, SpendLogger } from "../components/editors";
+import { TxEditor, SpendLogger } from "../components/editors";
 import { useSheet } from "../lib/sheet";
 import { dayLabel, fmtForeign, fmtMethod, money0 } from "../lib/format";
 
@@ -80,7 +80,7 @@ export function Spend({ burn }: { burn: BurnState }) {
               <Card pad={4}>
                 {g.items.map((x, i) => (
                   <TxRow key={x.id} x={x} last={i === g.items.length - 1}
-                    onTap={() => sheet.open(x.kind === "cashlog" ? <CashLogEditor row={x} /> : <TxEditor tx={x} />)} />
+                    onTap={() => sheet.open(<TxEditor tx={x} />)} />
                 ))}
               </Card>
             </div>
@@ -96,13 +96,15 @@ export function Spend({ burn }: { burn: BurnState }) {
 // (e.g. method) isn't present. Title-cased labels too.
 function MetaLine({ x, isTopup }: { x: FeedRow; isTopup: boolean }) {
   const parts: { text: string; color?: string }[] = [];
-  const method = fmtMethod(x.method);
-  if (method) parts.push({ text: method });
+  // Up rows carry Up's own purchase method; manual rows carry the one the user
+  // picked when logging it.
+  const method = fmtMethod(x.method) ?? paymentLabel(x.paymentMethod);
+  if (method) parts.push({ text: method, color: x.paymentMethod === "cash" ? "var(--c-cash)" : undefined });
   if (x.excluded) parts.push({ text: "Excluded", color: "var(--ink-3)" });
   if (x.isAccom) parts.push({ text: "Stay", color: "var(--c-stay)" });
   if (x.spreadDays) parts.push({ text: `Spread ${x.spreadDays}d`, color: "var(--accent)" });
   if (x.incoming) parts.push({ text: x.countsAsCredit ? "Credit" : "Incoming", color: "var(--good)" });
-  if (x.kind === "cashlog" && x.cashLogKind === "spend") parts.push({ text: "Logged", color: "var(--c-cash)" });
+  if (x.source === "manual" && !isTopup) parts.push({ text: "Logged", color: "var(--accent)" });
   if (isTopup) parts.push({ text: "Float top-up" });
   if (parts.length === 0) return null;
   return (

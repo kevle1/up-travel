@@ -37,7 +37,24 @@ export const TripPatchSchema = z.object({
 });
 export type TripPatch = z.infer<typeof TripPatchSchema>;
 
-// ── Transaction (Up-sourced source of truth) ──────────────────────────────────
+// ── Payment method (manual spends only) ───────────────────────────────────────
+// How a manually-logged spend was paid. Up-sourced rows leave this null and
+// carry Up's own cardPurchaseMethod instead. "cash" is the only value that
+// draws down the cash float.
+export const PAYMENT_METHODS = [
+  { id: "cash", label: "Cash", hint: "Comes out of your cash on hand" },
+  { id: "card", label: "Card", hint: "A card or account Up can't see" },
+  { id: "other", label: "Other", hint: "Transfer, split bill, someone else paid" },
+] as const;
+
+export const PaymentMethodSchema = z.enum(["cash", "card", "other"]);
+export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
+
+export function paymentLabel(m: PaymentMethod | null | undefined): string | null {
+  return m ? PAYMENT_METHODS.find((p) => p.id === m)!.label : null;
+}
+
+// ── Transaction (every spend, Up-sourced or manually logged) ──────────────────
 const ForeignPair = z.object({
   foreignAmount: z.number().nullable(),
   foreignCurrency: z.string().length(3).nullable(),
@@ -57,6 +74,8 @@ export const TransactionSchema = z.object({
   upCategoryParent: z.string().nullable(),
   upCategoryChild: z.string().nullable(),
   cardPurchaseMethod: z.string().nullable(),
+  /** Set on manually-logged spends only; null on Up-sourced rows. */
+  paymentMethod: PaymentMethodSchema.nullable(),
   /** Snapshot of which city the user was in when the spend happened. Set at
    *  sync/insert time from the stay that covers the date. Null if no stay
    *  covered the day. */
@@ -124,38 +143,22 @@ export const StayPatchSchema = z.object({
 });
 export type StayPatch = z.infer<typeof StayPatchSchema>;
 
-// ── Cash log (user-entered cash spend or ATM top-up) ──────────────────────────
-export const CashLogSchema = z.object({
-  id: z.string(),
-  tripId: z.number().int(),
-  /** kind is kept for legacy data; new entries are always "spend". */
-  kind: z.enum(["spend", "topup"]),
-  occurredAt: z.number().int(),
-  amountAudCents: z.number().int().positive(),
-  foreignAmount: z.number().nullable(),
-  foreignCurrency: z.string().length(3).nullable(),
-  travelCategory: z.string(),
-  /** When true, this spend draws from the cash float (and Up-sourced ATM
-   *  withdrawals refill it). When false (default) the spend just counts as
-   *  burn with no float interaction. */
-  isCash: z.boolean(),
-  /** Snapshot of which city the user was in. See Transaction.city. */
-  city: z.string().nullable(),
-  note: z.string().nullable(),
-});
-export type CashLog = z.infer<typeof CashLogSchema>;
-
-export const CashLogCreateSchema = z.object({
-  kind: z.enum(["spend", "topup"]).optional().default("spend"),
-  occurredAt: z.number().int().optional(), // defaults to now in route
+// ── Manual spend (user-entered, stored as a source:"manual" transaction) ──────
+// Lands in the same table as Up's transactions so it behaves like any other
+// spend: re-taggable, linkable to a stay, spreadable, excludable.
+export const ManualSpendCreateSchema = z.object({
+  /** Row label. Falls back to the travel category's label when blank. */
+  description: z.string().max(200).optional(),
+  occurredAt: z.number().int().optional(), // defaults to now in the route
+  /** Magnitude in cents; stored negative to match Up's spend convention. */
   amountAudCents: z.number().int().positive(),
   foreignAmount: z.number().positive().nullable().optional(),
   foreignCurrency: z.string().length(3).nullable().optional(),
   travelCategory: z.string().optional(),
-  isCash: z.boolean().optional().default(false),
-  note: z.string().nullable().optional(),
+  paymentMethod: PaymentMethodSchema.optional().default("card"),
+  notes: z.string().nullable().optional(),
 });
-export type CashLogCreate = z.infer<typeof CashLogCreateSchema>;
+export type ManualSpendCreate = z.infer<typeof ManualSpendCreateSchema>;
 
 // ── Up Bank API shapes (used by sync + classify) ──────────────────────────────
 const UpMoney = z.object({

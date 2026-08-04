@@ -1,7 +1,9 @@
 // D1 schema as a list of one-statement-per-element strings. `CREATE TABLE IF
 // NOT EXISTS` everywhere so the same array can be replayed at worker startup
 // for first-deploy bootstrap and pre-pended to the seed script. Kept as .mjs
-// so the seed script (plain Node) can import it without a TS build step.
+// so the seed script (plain Node) can import it without a TS build step. Keep
+// ".sql" out of the filename - Vite matches on it and serves the file as raw
+// text instead of a module, which breaks importers under test.
 
 export default [
   `CREATE TABLE IF NOT EXISTS trips (
@@ -29,6 +31,7 @@ export default [
     up_category_parent text,
     up_category_child text,
     card_purchase_method text,
+    payment_method text,
     city text,
     is_transfer integer DEFAULT 0 NOT NULL,
     is_atm integer DEFAULT 0 NOT NULL,
@@ -77,4 +80,11 @@ export default [
     FOREIGN KEY (trip_id) REFERENCES trips(id) ON UPDATE no action ON DELETE no action
   )`,
   `CREATE INDEX IF NOT EXISTS cash_logs_trip_time ON cash_logs (trip_id, occurred_at)`,
+  // One row per applied data migration. CREATE TABLE IF NOT EXISTS can bring a
+  // schema forward but can't reshape rows, so anything that moves data records
+  // itself here to stay one-shot.
+  `CREATE TABLE IF NOT EXISTS migrations (
+    id text PRIMARY KEY NOT NULL,
+    applied_at integer NOT NULL
+  )`,
 ];

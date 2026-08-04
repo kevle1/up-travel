@@ -2,10 +2,11 @@ import { useQuery } from "@tanstack/react-query";
 import { paceStatus, type BurnState } from "@up-travel/shared";
 import { Card, Num, PaceBadge, StatTile, STATUS_COLOR } from "../components/ui";
 import { CatList } from "../components/CatList";
+import { CategoryIcon } from "../components/CategoryIcon";
 import { Sparkline } from "../components/charts";
 import { TripHeader } from "./_TripHeader";
 import { api } from "../lib/api";
-import { money0, relTime, signed } from "../lib/format";
+import { dayLabel, money0, relTime, signed } from "../lib/format";
 
 export function Today({ burn }: { burn: BurnState }) {
   if (burn.isComplete) return <TripSummary burn={burn} />;
@@ -34,6 +35,8 @@ export function Today({ burn }: { burn: BurnState }) {
           <div style={{ marginTop: 9 }}><PaceBadge level={lvl7} /></div>
         </Card>
       </div>
+
+      <YesterdayNote burn={burn} />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <StatTile
@@ -99,6 +102,61 @@ export function Today({ burn }: { burn: BurnState }) {
 
       <LastSynced />
     </div>
+  );
+}
+
+// A one-glance recap of the day just gone. It sits under the two headline
+// tiles because early in the day "today so far" is nearly empty and yesterday
+// is the number that actually tells you how you're travelling. Hidden on the
+// trip's first day, when there is no day before it.
+function YesterdayNote({ burn }: { burn: BurnState }) {
+  const row = burn.yesterdayRow;
+  if (!row) return null;
+
+  const spent = row.total;
+  const label = dayLabel(row.date);
+  const top = burn.catBreakdownYesterday?.items[0];
+  const lvl = paceStatus(spent, burn.target);
+  const diff = burn.target - spent;
+
+  return (
+    <Card pad={14}>
+      <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+        <span style={{
+          width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          background: top ? `${top.color}1f` : "var(--chip)",
+          color: top ? top.color : "var(--ink-3)",
+        }}>
+          <CategoryIcon cat={top?.cat ?? "other"} size={16} />
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {spent > 0 ? (
+            <>
+              <div style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
+                {label} you spent{" "}
+                <Num style={{ fontWeight: 700, color: STATUS_COLOR[lvl] }}>{money0(spent)}</Num>
+              </div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                {diff >= 0
+                  ? `${money0(diff)} under your ${money0(burn.target)} target`
+                  : `${money0(-diff)} over your ${money0(burn.target)} target`}
+                {top && ` · mostly ${top.label}`}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13.5, color: "var(--ink-2)" }}>
+                Nothing recorded {label.toLowerCase()}
+              </div>
+              <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 2 }}>
+                A free day, or spend you still need to log
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </Card>
   );
 }
 

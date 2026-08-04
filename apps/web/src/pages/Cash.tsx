@@ -10,21 +10,18 @@ import { fmtDate, money0 } from "../lib/format";
 export function Cash({ burn }: { burn: BurnState }) {
   const sheet = useSheet();
   const qc = useQueryClient();
-  const deleteCashLog = useMutation({
-    mutationFn: (id: string) => api.cashLogs.remove(id),
+  const deleteSpend = useMutation({
+    mutationFn: (id: string) => api.transactions.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["burn"] }),
   });
 
-  // Cash flow only: Up-sourced ATM withdrawals (card + internal), manual cash
-  // topups, and manual spends that were flagged "Paid in cash". Non-cash
-  // manual spends live in the Spend tab, not here, so the Withdrawn/Spent/
+  // Cash flow only: ATM withdrawals (which fill the wallet) and spends the
+  // user logged as paid in cash (which empty it). Spends paid by card or
+  // anything else live in the Spend tab, not here, so the Withdrawn/Spent/
   // On-hand triple reconciles cleanly with the server's cashFloat.
-  const cashRows = burn.feed.filter((x) =>
-    (x.kind === "card" && x.internal && x.method === "ATM") ||
-    (x.kind === "cashlog" && x.isCash),
-  );
-  const withdrawn = cashRows.filter((x) => x.cashLogKind === "topup" || (x.kind === "card" && x.internal)).reduce((a, x) => a + x.aud, 0);
-  const spent = cashRows.filter((x) => x.kind === "cashlog" && x.cashLogKind === "spend").reduce((a, x) => a + x.aud, 0);
+  const cashRows = burn.feed.filter((x) => x.internal || x.paymentMethod === "cash");
+  const withdrawn = cashRows.filter((x) => x.internal).reduce((a, x) => a + x.aud, 0);
+  const spent = cashRows.filter((x) => !x.internal).reduce((a, x) => a + x.aud, 0);
   const onHand = burn.cashFloat;
 
   return (
@@ -46,7 +43,7 @@ export function Cash({ burn }: { burn: BurnState }) {
             </div>
           ))}
         </div>
-        <button onClick={() => sheet.open(<SpendLogger />)} type="button" style={{
+        <button onClick={() => sheet.open(<SpendLogger defaultMethod="cash" />)} type="button" style={{
           marginTop: 16, width: "100%", border: 0, background: "var(--accent)", color: "#fff",
           borderRadius: 12, padding: "13px", fontSize: 14.5, fontWeight: 600, cursor: "pointer",
         }}>Log a cash spend</button>
@@ -59,7 +56,7 @@ export function Cash({ burn }: { burn: BurnState }) {
         )}
         {cashRows.slice(0, 30).map((e, i, arr) => (
           <CashRow key={e.id} e={e} last={i === Math.min(arr.length, 30) - 1}
-            onDelete={() => deleteCashLog.mutate(e.id)} />
+            onDelete={() => deleteSpend.mutate(e.id)} />
         ))}
       </Card>
     </div>
@@ -67,8 +64,9 @@ export function Cash({ burn }: { burn: BurnState }) {
 }
 
 function CashRow({ e, last, onDelete }: { e: FeedRow; last: boolean; onDelete: () => void }) {
-  const isW = e.cashLogKind === "topup" || (e.kind === "card" && e.internal);
-  const userLogged = e.kind === "cashlog";
+  const isW = e.internal;
+  // Only hand-logged rows can be deleted - Up-sourced ones return on next sync.
+  const userLogged = e.source === "manual";
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 12, padding: "11px 12px",

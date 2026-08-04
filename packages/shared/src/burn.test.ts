@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBurn, paceStatus } from "./burn";
-import type { Trip, Transaction, TransactionOverride, Stay, CashLog } from "./schemas";
+import type { Trip, Transaction, TransactionOverride, Stay } from "./schemas";
 
 // Helpers ─────────────────────────────────────────────────────────────────────
 const ms = (iso: string, hour = 12) => Date.parse(`${iso}T${String(hour).padStart(2, "0")}:00:00Z`);
@@ -27,6 +27,7 @@ function tx(over: Partial<Transaction>): Transaction {
     foreignAmount: null, foreignCurrency: null,
     description: "Test", upCategoryParent: "good-life", upCategoryChild: "restaurants-and-cafes",
     cardPurchaseMethod: "CONTACTLESS",
+    paymentMethod: null,
     city: null,
     isTransfer: false, isAtm: false,
     raw: null, syncedAt: 0,
@@ -34,9 +35,27 @@ function tx(over: Partial<Transaction>): Transaction {
   };
 }
 
+/** A hand-logged spend: source "manual", no Up category, a payment method. */
+function manual(over: Partial<Transaction>): Transaction {
+  return tx({
+    source: "manual",
+    upCategoryParent: null, upCategoryChild: null,
+    cardPurchaseMethod: null,
+    paymentMethod: "card",
+    ...over,
+  });
+}
+
 const noOverrides: TransactionOverride[] = [];
 const noStays: Stay[] = [];
-const noCash: CashLog[] = [];
+
+/** Manual rows keep their travel category on the override row. */
+function cat(txnId: string, travelCategory: string, over: Partial<TransactionOverride> = {}): TransactionOverride {
+  return {
+    txnId, tripId: 1, travelCategory, stayId: null, spreadDays: null,
+    countAsCredit: false, excluded: false, notes: null, ...over,
+  };
+}
 
 // Tests ───────────────────────────────────────────────────────────────────────
 
@@ -59,7 +78,7 @@ describe("buildBurn - base case", () => {
     tx({ id: "b", occurredAt: ms("2025-09-04"), amountAudCents: -120_00 }), // A$120 day 2
     tx({ id: "c", occurredAt: ms("2025-09-05"), amountAudCents: -240_00, upCategoryChild: "public-transport" }), // A$240 day 3 (over target)
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-05" });
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-05" });
 
   it("returns series spanning trip start → asOf", () => {
     expect(state.series).toHaveLength(3);
@@ -93,7 +112,7 @@ describe("buildBurn - excludes transfers and ATM top-ups from burn", () => {
     tx({ id: "atm", occurredAt: ms("2025-09-03"), amountAudCents: -200_00, isAtm: true, cardPurchaseMethod: "ATM" }),
     tx({ id: "xfer-out", occurredAt: ms("2025-09-03"), amountAudCents: -100_00, isTransfer: true }),
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-03" });
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-03" });
 
   it("only the real spend counts toward burn", () => {
     expect(state.cumulative).toBe(50);
@@ -119,7 +138,7 @@ describe("buildBurn - travel category override wins over Up's default", () => {
   const overrides: TransactionOverride[] = [
     { txnId: "x", tripId: 1, travelCategory: "health", stayId: null, spreadDays: null, countAsCredit: false, excluded: false, notes: null },
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-03" });
+  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-03" });
   const day = state.series[0]!;
   it("counts under the override bucket (health → Other)", () => {
     expect(day.Other).toBe(80);
@@ -146,7 +165,7 @@ describe("buildBurn - accommodation amortisation", () => {
     { txnId: "deposit", tripId: 1, travelCategory: null, stayId: 100, spreadDays: null, countAsCredit: false, excluded: false, notes: null },
     { txnId: "balance", tripId: 1, travelCategory: null, stayId: 100, spreadDays: null, countAsCredit: false, excluded: false, notes: null },
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides, stays, cashLogs: noCash, asOf: "2025-09-10" });
+  const state = buildBurn({ trip, transactions: txns, overrides, stays, asOf: "2025-09-10" });
 
   it("spreads the total evenly across the 8 nights", () => {
     expect(state.stays[0]!.totalCost).toBe(800);
@@ -179,29 +198,135 @@ describe("buildBurn - accommodation amortisation", () => {
 
 describe("buildBurn - cash float", () => {
   const trip = makeTrip();
-  const cashLogs: CashLog[] = [
-    { id: "spend1", tripId: 1, kind: "spend", occurredAt: ms("2025-09-03"), amountAudCents: 30_00, foreignAmount: null, foreignCurrency: null, travelCategory: "food", isCash: true, city: null, note: "coffee" },
-    { id: "top1", tripId: 1, kind: "topup", occurredAt: ms("2025-09-03"), amountAudCents: 100_00, foreignAmount: null, foreignCurrency: null, travelCategory: "cash", isCash: true, city: null, note: null },
+  const txns: Transaction[] = [
+    tx({ id: "atm", occurredAt: ms("2025-09-03"), amountAudCents: -100_00, isAtm: true, cardPurchaseMethod: "ATM" }),
+    manual({ id: "coffee", occurredAt: ms("2025-09-03"), amountAudCents: -30_00, paymentMethod: "cash", description: "coffee" }),
   ];
-  const state = buildBurn({ trip, transactions: [], overrides: noOverrides, stays: noStays, cashLogs, asOf: "2025-09-03" });
+  const state = buildBurn({
+    trip, transactions: txns, overrides: [cat("coffee", "food")], stays: noStays, asOf: "2025-09-03",
+  });
 
-  it("user spend counts as burn", () => {
+  it("a logged spend counts as burn", () => {
     expect(state.series[0]!.Food).toBe(30);
   });
-  it("user top-up adds to cash float", () => {
+  it("the ATM withdrawal fills the float and the cash spend draws it down", () => {
     expect(state.cashFloat).toBe(100 - 30);
   });
 
-  it("isCash:false spend counts as burn but doesn't touch the float", () => {
-    const logs: CashLog[] = [
-      { id: "top", tripId: 1, kind: "topup", occurredAt: ms("2025-09-03"), amountAudCents: 100_00, foreignAmount: null, foreignCurrency: null, travelCategory: "cash", isCash: true, city: null, note: null },
-      { id: "noncash", tripId: 1, kind: "spend", occurredAt: ms("2025-09-03"), amountAudCents: 20_00, foreignAmount: null, foreignCurrency: null, travelCategory: "food", isCash: false, city: null, note: "split lunch" },
+  it("a card-paid spend counts as burn but doesn't touch the float", () => {
+    const rows: Transaction[] = [
+      tx({ id: "atm", occurredAt: ms("2025-09-03"), amountAudCents: -100_00, isAtm: true, cardPurchaseMethod: "ATM" }),
+      manual({ id: "split", occurredAt: ms("2025-09-03"), amountAudCents: -20_00, paymentMethod: "card", description: "split lunch" }),
     ];
-    const s = buildBurn({ trip, transactions: [], overrides: noOverrides, stays: noStays, cashLogs: logs, asOf: "2025-09-03" });
+    const s = buildBurn({
+      trip, transactions: rows, overrides: [cat("split", "food")], stays: noStays, asOf: "2025-09-03",
+    });
     expect(s.series[0]!.Food).toBe(20); // counts as burn
     expect(s.cashFloat).toBe(100); // float untouched
-    expect(s.feed.find((r) => r.id === "noncash")?.isCash).toBe(false);
-    expect(s.feed.find((r) => r.id === "top")?.isCash).toBe(true);
+    expect(s.feed.find((r) => r.id === "split")?.isCash).toBe(false);
+    expect(s.feed.find((r) => r.id === "atm")?.isCash).toBe(true);
+  });
+
+  it("cash still leaves the wallet even when the spend is excluded from burn", () => {
+    const rows: Transaction[] = [
+      tx({ id: "atm", occurredAt: ms("2025-09-03"), amountAudCents: -100_00, isAtm: true, cardPurchaseMethod: "ATM" }),
+      manual({ id: "reimbursed", occurredAt: ms("2025-09-03"), amountAudCents: -40_00, paymentMethod: "cash" }),
+    ];
+    const s = buildBurn({
+      trip, transactions: rows,
+      overrides: [cat("reimbursed", "food", { excluded: true })],
+      stays: noStays, asOf: "2025-09-03",
+    });
+    expect(s.cumulative).toBe(0);
+    expect(s.cashFloat).toBe(60);
+  });
+});
+
+describe("buildBurn - manual spends behave like any other transaction", () => {
+  const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-30" });
+
+  it("can be linked to a stay and amortised across its nights", () => {
+    const stays: Stay[] = [{
+      id: 7, tripId: 1, name: "Kotor hostel", city: "Kotor", checkIn: "2025-09-01", nights: 4,
+    }];
+    const txns = [manual({ id: "hostel", occurredAt: ms("2025-09-01"), amountAudCents: -400_00, paymentMethod: "cash" })];
+    const overrides = [cat("hostel", "accommodation", { stayId: 7 })];
+    const s = buildBurn({ trip, transactions: txns, overrides, stays, asOf: "2025-09-04" });
+
+    expect(s.stays[0]!.totalCost).toBe(400);
+    expect(s.stays[0]!.perNight).toBe(100);
+    expect(s.series[0]!.total).toBe(100); // not a $400 spike on day one
+    expect(s.feed.find((r) => r.id === "hostel")!.isAccom).toBe(true);
+    // Paying the hostel in cash still empties the wallet.
+    expect(s.cashFloat).toBe(-400);
+  });
+
+  it("can be spread across days", () => {
+    const txns = [manual({ id: "pass", occurredAt: ms("2025-09-01"), amountAudCents: -50_00 })];
+    const overrides = [cat("pass", "local-transport", { spreadDays: 5 })];
+    const s = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-10" });
+    for (let i = 0; i < 5; i++) expect(s.series[i]!.Transport).toBe(10);
+    expect(s.cumulative).toBe(50);
+  });
+
+  it("back-dated spends land on the day they happened", () => {
+    const txns = [manual({ id: "back", occurredAt: ms("2025-09-03"), amountAudCents: -25_00 })];
+    const s = buildBurn({
+      trip, transactions: txns, overrides: [cat("back", "food")], stays: noStays, asOf: "2025-09-06",
+    });
+    expect(s.series[2]!.Food).toBe(25); // 2025-09-03 is the third day
+    expect(s.todayBurn).toBe(0);
+    expect(s.feed.find((r) => r.id === "back")!.date).toBe("2025-09-03");
+  });
+
+  it("exposes source and paymentMethod on the feed row", () => {
+    const txns = [manual({ id: "m", occurredAt: ms("2025-09-02"), amountAudCents: -12_00, paymentMethod: "other" })];
+    const s = buildBurn({
+      trip, transactions: txns, overrides: [cat("m", "food")], stays: noStays, asOf: "2025-09-02",
+    });
+    const row = s.feed.find((r) => r.id === "m")!;
+    expect(row.source).toBe("manual");
+    expect(row.paymentMethod).toBe("other");
+    expect(row.isCash).toBe(false);
+  });
+
+  it("shows up among the biggest spends of the trip", () => {
+    const txns = [
+      tx({ id: "small", occurredAt: ms("2025-09-02"), amountAudCents: -20_00 }),
+      manual({ id: "big", occurredAt: ms("2025-09-02"), amountAudCents: -300_00, description: "Boat day" }),
+    ];
+    const s = buildBurn({
+      trip, transactions: txns, overrides: [cat("big", "sights")], stays: noStays, asOf: "2025-09-02",
+    });
+    expect(s.outliers[0]!.label).toBe("Boat day");
+    expect(s.outliers[0]!.aud).toBe(300);
+  });
+});
+
+describe("buildBurn - yesterday", () => {
+  const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-30" });
+  const txns: Transaction[] = [
+    tx({ id: "d1", occurredAt: ms("2025-09-01"), amountAudCents: -40_00 }),
+    tx({ id: "d2", occurredAt: ms("2025-09-02"), amountAudCents: -90_00 }),
+    tx({ id: "d2b", occurredAt: ms("2025-09-02"), amountAudCents: -30_00, upCategoryChild: "public-transport" }),
+    tx({ id: "d3", occurredAt: ms("2025-09-03"), amountAudCents: -10_00 }),
+  ];
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-03" });
+
+  it("reports the day before asOf", () => {
+    expect(state.yesterdayRow?.date).toBe("2025-09-02");
+    expect(state.yesterdayRow?.total).toBe(120);
+  });
+
+  it("breaks yesterday down by category, biggest first", () => {
+    expect(state.catBreakdownYesterday?.items.map((i) => i.cat)).toEqual(["food", "local-transport"]);
+    expect(state.catBreakdownYesterday?.total).toBe(120);
+  });
+
+  it("is null on the trip's first day", () => {
+    const s = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-01" });
+    expect(s.yesterdayRow).toBeNull();
+    expect(s.catBreakdownYesterday).toBeNull();
   });
 });
 
@@ -213,7 +338,7 @@ describe("buildBurn - completed trip", () => {
     tx({ id: "c", occurredAt: ms("2025-09-05"), amountAudCents: -100_00 }),
   ];
   // asOf in the future → clamps to trip end + flags complete
-  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2026-01-01" });
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2026-01-01" });
 
   it("clamps asOf to trip end", () => {
     expect(state.asOf).toBe("2025-09-05");
@@ -234,7 +359,7 @@ describe("buildBurn - feed clamps to trip window", () => {
     tx({ id: "in2", occurredAt: ms("2025-11-06"), amountAudCents: -50_00 }),
     tx({ id: "after", occurredAt: ms("2026-06-13"), amountAudCents: -50_00 }), // post-trip
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2026-06-13" });
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2026-06-13" });
 
   it("clamps asOf to trip end for completed trips", () => {
     expect(state.asOf).toBe("2025-11-06");
@@ -253,7 +378,7 @@ describe("buildBurn - feed clamps to trip window", () => {
     const overrides: TransactionOverride[] = [
       { txnId: "before", tripId: 1, travelCategory: null, stayId: 1, spreadDays: null, countAsCredit: false, excluded: false, notes: null },
     ];
-    const s = buildBurn({ trip, transactions: txns, overrides, stays, cashLogs: noCash, asOf: "2026-06-13" });
+    const s = buildBurn({ trip, transactions: txns, overrides, stays, asOf: "2026-06-13" });
     expect(s.feed.find((r) => r.id === "before")?.isAccom).toBe(true);
   });
 });
@@ -267,7 +392,7 @@ describe("buildBurn - spreadDays amortises across N days", () => {
   const overrides: TransactionOverride[] = [
     { txnId: "pass", tripId: 1, travelCategory: null, stayId: null, spreadDays: 5, countAsCredit: false, excluded: false, notes: null },
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-10" });
+  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-10" });
 
   it("each of the 5 days carries 1/5 of the total in the right bucket", () => {
     for (let i = 0; i < 5; i++) {
@@ -298,12 +423,12 @@ describe("buildBurn - incoming funds: shown in feed, opt-in to count", () => {
   ];
 
   it("feed shows incoming funds but still hides transfers", () => {
-    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-30" });
+    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-30" });
     expect(state.feed.map((r) => r.id).sort()).toEqual(["refund", "salary", "spend"]);
   });
 
   it("incoming rows expose the incoming flag and positive aud magnitude", () => {
-    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-30" });
+    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-30" });
     const refund = state.feed.find((r) => r.id === "refund")!;
     expect(refund.incoming).toBe(true);
     expect(refund.aud).toBe(30);
@@ -311,7 +436,7 @@ describe("buildBurn - incoming funds: shown in feed, opt-in to count", () => {
   });
 
   it("burn cumulative unchanged by incoming funds when not opted in", () => {
-    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-30" });
+    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-30" });
     expect(state.cumulative).toBe(120);
   });
 
@@ -319,14 +444,14 @@ describe("buildBurn - incoming funds: shown in feed, opt-in to count", () => {
     const overrides: TransactionOverride[] = [
       { txnId: "refund", tripId: 1, travelCategory: null, stayId: null, spreadDays: null, countAsCredit: true, excluded: false, notes: null },
     ];
-    const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-30" });
+    const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-30" });
     // Spend 120 on day 5, refund -30 on day 8 → cumulative 90.
     expect(state.cumulative).toBe(90);
     expect(state.feed.find((r) => r.id === "refund")!.countsAsCredit).toBe(true);
   });
 
   it("outliers still exclude positive-amount transactions", () => {
-    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-30" });
+    const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-30" });
     expect(state.outliers.map((o) => o.label)).not.toContain("salary");
   });
 });
@@ -341,7 +466,7 @@ describe("buildBurn - foreign amount is positive in the feed", () => {
       foreignAmount: -142.30, foreignCurrency: "USD",
     }),
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-03" });
+  const state = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-03" });
   const row = state.feed.find((r) => r.id === "fx")!;
   it("returns the absolute value with the currency code", () => {
     expect(row.foreign).toEqual({ value: 142.30, currencyCode: "USD" });
@@ -357,7 +482,7 @@ describe("buildBurn - excluded transactions vanish from burn", () => {
   const overrides: TransactionOverride[] = [
     { txnId: "noise", tripId: 1, travelCategory: null, stayId: null, spreadDays: null, countAsCredit: false, excluded: true, notes: "duplicate" },
   ];
-  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, cashLogs: noCash, asOf: "2025-09-03" });
+  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-03" });
   it("excluded amount removed from cumulative", () => {
     expect(state.cumulative).toBe(50);
   });

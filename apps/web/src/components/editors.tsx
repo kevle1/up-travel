@@ -1,8 +1,8 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  upLabel, upParentName,
-  type BurnState, type FeedRow, type StayView, type Trip,
+  upLabel, upParentName, paymentLabel, PAYMENT_METHODS,
+  type BurnState, type FeedRow, type PaymentMethod, type StayView, type Trip,
 } from "@up-travel/shared";
 import { api } from "../lib/api";
 import { useSheet } from "../lib/sheet";
@@ -49,6 +49,22 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
     mutationFn: () => api.transactions.resetOverride(tx.id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["burn"] }),
   });
+  const remove = useMutation({
+    mutationFn: () => api.transactions.remove(tx.id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["burn"] });
+      sheet.close();
+      toast.show({ message: `Deleted "${tx.description}"` });
+    },
+    onError: (e) => {
+      toast.show({
+        message: `Couldn't delete: ${e instanceof Error ? e.message : "unknown error"}`,
+        duration: 8000,
+      });
+    },
+  });
+
+  const manual = tx.source === "manual";
 
   if (tx.isAccom) {
     return <AccomBadge tx={tx} />;
@@ -63,9 +79,21 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
         display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", borderRadius: 12,
         background: "var(--chip)", marginBottom: 16, fontSize: 12.5, color: "var(--ink-2)",
       }}>
-        <span>Up tagged this</span>
-        <strong style={{ color: "var(--ink)" }}>{upLabel(tx.upTag)}</strong>
-        <span style={{ color: "var(--ink-3)" }}>· {upParentName(tx.upTag)}</span>
+        {manual ? (
+          <>
+            <span>You logged this</span>
+            <strong style={{ color: "var(--ink)" }}>{paymentLabel(tx.paymentMethod) ?? "Manual"}</strong>
+            {tx.paymentMethod === "cash" && (
+              <span style={{ color: "var(--c-cash)" }}>· drawn from cash on hand</span>
+            )}
+          </>
+        ) : (
+          <>
+            <span>Up tagged this</span>
+            <strong style={{ color: "var(--ink)" }}>{upLabel(tx.upTag)}</strong>
+            <span style={{ color: "var(--ink-3)" }}>· {upParentName(tx.upTag)}</span>
+          </>
+        )}
       </div>
 
       {tx.incoming && (
@@ -96,10 +124,12 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
           onChange={(id) => patch.mutate({ travelCategory: id })}
         />
       </Field>
-      <button type="button" onClick={() => reset.mutate()} style={{
-        border: 0, background: "none", color: "var(--ink-3)", fontSize: 12.5, cursor: "pointer",
-        marginBottom: 14, textDecoration: "underline",
-      }}>Reset to Up's tag</button>
+      {!manual && (
+        <button type="button" onClick={() => reset.mutate()} style={{
+          border: 0, background: "none", color: "var(--ink-3)", fontSize: 12.5, cursor: "pointer",
+          marginBottom: 14, textDecoration: "underline",
+        }}>Reset to Up's tag</button>
+      )}
       <div style={{ height: 1, background: "var(--line)", margin: "4px 0 16px" }} />
 
       <SpreadControl
@@ -149,11 +179,31 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
               opacity: patch.isPending ? 0.6 : 1,
             }}
           >
-            <Icon name="delete" size={18} />
+            <Icon name="visibility_off" size={18} />
             Exclude from totals
           </button>
         )}
       </div>
+      {/* Up-sourced rows come back on the next sync, so only manual spends can
+          actually go away. */}
+      {manual && (
+        <button
+          type="button"
+          onClick={() => remove.mutate()}
+          disabled={remove.isPending}
+          style={{
+            marginTop: 10, width: "100%", border: 0, borderRadius: 14, padding: "13px",
+            fontSize: 14, fontWeight: 600,
+            background: "transparent", color: "var(--over)",
+            cursor: remove.isPending ? "default" : "pointer",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
+            opacity: remove.isPending ? 0.6 : 1,
+          }}
+        >
+          <Icon name="delete" size={17} />
+          {remove.isPending ? "Deleting…" : "Delete this spend"}
+        </button>
+      )}
     </Sheet>
   );
 }
@@ -368,123 +418,35 @@ export function StayCreator({ tx }: { tx?: FeedRow }) {
   );
 }
 
-// ── Cash log editor (view + delete) ───────────────────────────────────────────
-// Manual spends + ATM topups don't live in /api/transactions so the regular
-// TxEditor can't touch them. This sheet shows the row's details and a delete
-// button; we don't surface category editing since the user can just delete and
-// re-add at the desired category if it's wrong.
-export function CashLogEditor({ row }: { row: FeedRow }) {
-  const sheet = useSheet();
-  const toast = useToast();
-  const qc = useQueryClient();
-  const remove = useMutation({
-    mutationFn: () => api.cashLogs.remove(row.id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["burn"] });
-      sheet.close();
-      toast.show({ message: `Deleted "${row.description}"` });
-    },
-    onError: (e) => {
-      toast.show({
-        message: `Couldn't delete: ${e instanceof Error ? e.message : "unknown error"}`,
-        duration: 8000,
-      });
-    },
-  });
-  const isTopup = row.cashLogKind === "topup";
-  return (
-    <Sheet
-      title={row.description}
-      subtitle={`${money2(row.aud)} · ${fmtDate(row.date)}`}
-      onClose={sheet.close}
-    >
-      <div style={{
-        display: "flex", flexDirection: "column", gap: 10,
-        padding: "12px 14px", borderRadius: 12, background: "var(--chip)", marginBottom: 16,
-      }}>
-        <Row label="Type">
-          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-            {isTopup ? "Cash withdrawal" : "Manual spend"}
-          </span>
-        </Row>
-        {!isTopup && (
-          <Row label="Paid in physical cash">
-            <span style={{ fontSize: 13, fontWeight: 600, color: row.isCash ? "var(--c-cash)" : "var(--ink-3)" }}>
-              {row.isCash ? "Yes" : "No"}
-            </span>
-          </Row>
-        )}
-        <Row label="Category">
-          <span style={{ fontSize: 13, color: "var(--ink)" }}>
-            {/* Friendly label of the travel category */}
-            {row.category}
-          </span>
-        </Row>
-      </div>
-      <div style={{ fontSize: 12.5, color: "var(--ink-3)", marginBottom: 16, lineHeight: 1.5 }}>
-        {isTopup
-          ? "Deleting this top-up removes it from your cash on hand and any related activity rows."
-          : row.isCash
-            ? "Deleting this returns the amount to your cash on hand and removes it from burn."
-            : "Deleting this removes it from burn."}
-      </div>
-      <button
-        type="button"
-        onClick={() => remove.mutate()}
-        disabled={remove.isPending}
-        style={{
-          width: "100%", border: 0, borderRadius: 14, padding: "14px",
-          fontSize: 15.5, fontWeight: 600,
-          background: "var(--over-bg)", color: "var(--over)",
-          cursor: remove.isPending ? "default" : "pointer",
-          display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
-          opacity: remove.isPending ? 0.6 : 1,
-        }}
-      >
-        <Icon name="delete" size={18} />
-        {remove.isPending ? "Deleting…" : "Delete"}
-      </button>
-    </Sheet>
-  );
-}
-
-function Row({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
-      <span style={{ fontSize: 12.5, color: "var(--ink-2)" }}>{label}</span>
-      {children}
-    </div>
-  );
-}
-
 // ── Spend logger ──────────────────────────────────────────────────────────────
-// Generic manual spend entry. AUD only by design - covers paid-in-cash spends,
-// reimbursements Up didn't see, split bills, etc. "Paid in cash" toggle draws
-// the spend from the cash float (which Up-sourced ATM withdrawals fill).
-export function SpendLogger() {
+// Manual spend entry, for anything Up can't see: cash, another card, a bank
+// transfer, a bill a friend fronted. It saves as a regular transaction, so
+// once it's in you can re-tag it, spread it, put it under a stay or exclude
+// it exactly like a card spend. Back-dating is first-class - the day chips
+// cover the common "I forgot to log yesterday" case.
+export function SpendLogger({ defaultMethod = "card" }: { defaultMethod?: PaymentMethod }) {
   const sheet = useSheet();
   const qc = useQueryClient();
   const { data: burn } = useQuery({ queryKey: ["burn"], queryFn: () => api.burn() });
   const todayIso = burn?.asOf ?? new Date().toISOString().slice(0, 10);
-  const here = burn?.cityByDay[todayIso] ?? { city: burn?.trip.currentCity ?? "your trip" };
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(todayIso);
   const [cat, setCat] = useState("food");
-  const [note, setNote] = useState("");
-  const [paidInCash, setPaidInCash] = useState(false);
+  const [description, setDescription] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>(defaultMethod);
 
+  const here = burn?.cityByDay[date] ?? { city: burn?.trip.currentCity ?? "" };
   const numAmount = Number(amount) || 0;
 
   const create = useMutation({
-    mutationFn: () => api.cashLogs.create({
-      kind: "spend",
+    mutationFn: () => api.transactions.create({
+      // Midday UTC keeps the row on the picked calendar day regardless of the
+      // reader's timezone, matching how the burn engine buckets by UTC date.
       occurredAt: Date.parse(`${date}T12:00:00Z`),
       amountAudCents: Math.round(numAmount * 100),
-      foreignAmount: null,
-      foreignCurrency: null,
       travelCategory: cat,
-      isCash: paidInCash,
-      note: note || null,
+      paymentMethod: method,
+      description: description || undefined,
     }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["burn"] }); sheet.close(); },
   });
@@ -502,34 +464,90 @@ export function SpendLogger() {
           value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0" autoFocus
         />
       </Field>
-      <Field label="Date">
-        <input type="date" style={inputStyle} value={date} onChange={(e) => setDate(e.target.value)} />
+      <Field label="When">
+        <DayPicker value={date} onChange={setDate} today={todayIso} />
+      </Field>
+      <Field label="Paid with">
+        <PaymentPicker value={method} onChange={setMethod} />
       </Field>
       <Field label="What for"><CategoryInline value={cat} onChange={setCat} /></Field>
-      <Field label="Note (optional)">
-        <input style={inputStyle} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. split lunch, laundromat" />
+      <Field label="Description (optional)">
+        <input style={inputStyle} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="e.g. split lunch, laundromat" />
       </Field>
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-        padding: "12px 14px", borderRadius: 12, background: "var(--chip)", marginBottom: 16,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>Paid in cash</div>
-          <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 2, lineHeight: 1.4 }}>
-            Spent from withdrawn cash
-          </div>
-        </div>
-        <Toggle value={paidInCash} onChange={setPaidInCash} />
-      </div>
       <BigButton onClick={() => create.mutate()} disabled={!numAmount || create.isPending}>
         {create.isPending ? "Saving…" : "Log spend"}
       </BigButton>
+      <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 10, lineHeight: 1.5 }}>
+        Shows up in Spend like any other transaction - tap it there to put it under a stay, spread it over days or add notes.
+      </div>
     </Sheet>
   );
 }
 
-/** @deprecated Use SpendLogger. Kept as an alias to avoid stale imports. */
-export const CashLogger = SpendLogger;
+// Date field with Today/Yesterday shortcuts. The plain date input stays for
+// anything older, which is the "I'm catching up on the week" case.
+function DayPicker({ value, onChange, today }: {
+  value: string; onChange: (iso: string) => void; today: string;
+}) {
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  const chips: { label: string; iso: string }[] = [
+    { label: "Today", iso: today },
+    { label: "Yesterday", iso: yesterday },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {chips.map((c) => {
+        const on = value === c.iso;
+        return (
+          <button key={c.iso} type="button" onClick={() => onChange(c.iso)} style={{
+            flexShrink: 0, cursor: "pointer", whiteSpace: "nowrap",
+            borderRadius: 12, padding: "12px 13px", fontSize: 13.5, fontWeight: 600,
+            border: on ? "1.5px solid var(--accent)" : "1px solid var(--line)",
+            background: on ? "var(--accent-wash)" : "var(--surface)",
+            color: on ? "var(--accent)" : "var(--ink-2)",
+          }}>{c.label}</button>
+        );
+      })}
+      <input type="date" max={today} style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+        value={value} onChange={(e) => onChange(e.target.value)} />
+    </div>
+  );
+}
+
+const METHOD_ICON: Record<PaymentMethod, string> = {
+  cash: "payments", card: "credit_card", other: "more_horiz",
+};
+
+// How it was paid. Only "cash" touches the cash float; the other two are just
+// spend Up never saw.
+function PaymentPicker({ value, onChange }: {
+  value: PaymentMethod; onChange: (m: PaymentMethod) => void;
+}) {
+  const hint = PAYMENT_METHODS.find((m) => m.id === value)!.hint;
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 8 }}>
+        {PAYMENT_METHODS.map((m) => {
+          const on = value === m.id;
+          return (
+            <button key={m.id} type="button" onClick={() => onChange(m.id)} style={{
+              flex: 1, cursor: "pointer", borderRadius: 12, padding: "11px 8px",
+              fontSize: 13.5, fontWeight: 600,
+              border: on ? "1.5px solid var(--accent)" : "1px solid var(--line)",
+              background: on ? "var(--accent-wash)" : "var(--surface)",
+              color: on ? "var(--accent)" : "var(--ink)",
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}>
+              <Icon name={METHOD_ICON[m.id]} size={16} />
+              {m.label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 7, lineHeight: 1.45 }}>{hint}</div>
+    </div>
+  );
+}
 
 // ── Trip switcher / creator / settings ────────────────────────────────────────
 export function TripSwitcher() {

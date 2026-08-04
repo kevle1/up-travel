@@ -3,7 +3,7 @@
 // design prototype, but server-rendered so the client can be a thin renderer.
 
 import { upToTravel, travelBucket, travelCategory, type TravelBucket } from "./categories";
-import type { Trip, Transaction, TransactionOverride, Stay, CashLog } from "./schemas";
+import { paymentLabel, type Trip, type Transaction, type TransactionOverride, type Stay, type PaymentMethod } from "./schemas";
 
 export const BUCKETS: readonly TravelBucket[] = ["Food", "Stay", "Transport", "Activities", "Cash", "Other"];
 
@@ -20,10 +20,10 @@ const spendDollars = (cents: number) => round2(-cents / 100);
 
 export interface BurnInput {
   trip: Trip;
+  /** Up-sourced and manually-logged spends alike - both live in `transactions`. */
   transactions: readonly Transaction[];
   overrides: readonly TransactionOverride[];
   stays: readonly Stay[];
-  cashLogs: readonly CashLog[];
   asOf: string; // YYYY-MM-DD; usually "today" in the trip's timezone (UTC here)
 }
 
@@ -63,19 +63,21 @@ export interface FeedRow {
   incoming: boolean;
   /** True if this incoming row was opted in to count against burn. */
   countsAsCredit: boolean;
-  /** Only meaningful on cashlog rows: true when the user flagged the spend
-   *  as "Paid in cash" (draws from the cash float). */
+  /** How a manually-logged spend was paid; null on Up-sourced rows. */
+  paymentMethod: PaymentMethod | null;
+  /** True when this spend draws from the cash float - physical cash out of the
+   *  wallet, or an ATM withdrawal putting it back in. */
   isCash: boolean;
   /** User-excluded from burn totals. Row still appears in the feed (greyed)
    *  so the user can re-include it. */
   excluded: boolean;
   /** Snapshot of the city the user was in when the spend happened, or null. */
   city: string | null;
-  /** Free-text notes the user attached. From transactionOverrides.notes for
-   *  card transactions, or cashLogs.note for manual rows. */
+  /** Free-text notes the user attached, from transactionOverrides.notes. */
   notes: string | null;
-  kind: "card" | "cashlog";
-  cashLogKind?: "spend" | "topup";
+  /** "manual" rows were logged by hand and can be deleted; "up" rows come back
+   *  on the next sync, so the UI offers exclude instead. */
+  source: "up" | "manual";
   internal: boolean;      // true for ATM withdrawals (float top-up, not burn)
   isTransfer: boolean;
 }
@@ -121,6 +123,8 @@ export interface BurnState {
   series: BurnDay[];
   todayBurn: number;
   todayRow: BurnDay;
+  /** The day before asOf, or null on the trip's first day (nothing before it). */
+  yesterdayRow: BurnDay | null;
   avgAll: number;
   avg7: number;
   avg30: number;
@@ -137,6 +141,8 @@ export interface BurnState {
   cashFloat: number; // dollars
   cityByDay: Record<string, { city: string }>;
   catBreakdownToday: CatBreakdownView;
+  /** Same shape for the day before asOf; null when there is no such day. */
+  catBreakdownYesterday: CatBreakdownView | null;
   /** Keyed by window: "3", "7", "14", "30", "all" - the cat breakdown for that span ending at asOf. */
   catBreakdownByWindow: Record<CatWindow, CatBreakdownView>;
   stays: StayView[];
@@ -146,7 +152,7 @@ export interface BurnState {
 }
 
 export function buildBurn(input: BurnInput): BurnState {
-  const { trip, transactions, overrides, stays, cashLogs } = input;
+  const { trip, transactions, overrides, stays } = input;
   // Clamp asOf to the trip window. Pre-trip → start; post-trip → end.
   const asOf =
     input.asOf < trip.startDate ? trip.startDate :
@@ -264,13 +270,6 @@ export function buildBurn(input: BurnInput): BurnState {
     }
   }
 
-  // User-logged cash spend counts as burn; top-ups don't.
-  for (const c of cashLogs) {
-    if (c.kind === "topup") continue;
-    const k = isoOf(new Date(c.occurredAt));
-    addBucket(k, travelBucket(c.travelCategory), round2(c.amountAudCents / 100), c.travelCategory);
-  }
-
   // Stays: amortise total across their nights
   for (const s of staysView) {
     if (!s.perNight) continue;
@@ -310,14 +309,15 @@ export function buildBurn(input: BurnInput): BurnState {
   const finalEnd = round2(budget - cumulative);
   const safeDaily = daysLeft > 0 ? round2(budgetLeft / daysLeft) : 0;
 
-  // Cash float: Up-sourced ATM withdrawals top it up. Manual cash logs only
-  // draw from it when the user flagged them as "Paid in cash" (isCash).
+  // Cash float: Up-sourced ATM withdrawals top it up, manual spends paid in
+  // cash draw it down. Deliberately independent of `excluded` and of stay
+  // links - the float tracks physical notes in the wallet, so cash still left
+  // it even when the spend doesn't count toward burn.
   let withdrawn = 0;
   let spent = 0;
-  for (const t of transactions) if (t.isAtm) withdrawn += round2(spendDollars(t.amountAudCents));
-  for (const c of cashLogs) {
-    if (c.kind === "topup") withdrawn += round2(c.amountAudCents / 100);
-    else if (c.isCash) spent += round2(c.amountAudCents / 100);
+  for (const t of transactions) {
+    if (t.isAtm) withdrawn += round2(spendDollars(t.amountAudCents));
+    else if (t.paymentMethod === "cash") spent += round2(spendDollars(t.amountAudCents));
   }
   const cashFloat = round2(withdrawn - spent);
 
@@ -340,7 +340,10 @@ export function buildBurn(input: BurnInput): BurnState {
   };
   const last = (n: number) => dayKeys.slice(Math.max(0, dayKeys.length - n));
 
+  const yesterdayKey = N >= 2 ? dayKeys[N - 2]! : null;
+  const yesterdayRow = yesterdayKey ? daily[yesterdayKey]! : null;
   const catBreakdownToday = breakdownOver([todayKey]);
+  const catBreakdownYesterday = yesterdayKey ? breakdownOver([yesterdayKey]) : null;
   const catBreakdownByWindow: Record<CatWindow, CatBreakdownView> = {
     "3": breakdownOver(last(3)),
     "7": breakdownOver(last(7)),
@@ -350,6 +353,8 @@ export function buildBurn(input: BurnInput): BurnState {
   };
 
   // ── Feed (Spend tab) ───────────────────────────────────────────────────────
+  // One row per transaction, Up-sourced and manually-logged alike, so a spend
+  // the user typed in behaves exactly like one Up saw.
   // Clamp to the trip window. Stay-linked transactions kept regardless so a
   // pre-trip deposit still appears. Transfers (Up's internal account-to-
   // account moves) stay hidden - they're not real spend or income. Incoming
@@ -389,43 +394,14 @@ export function buildBurn(input: BurnInput): BurnState {
       spreadDays: o?.spreadDays && o.spreadDays > 1 ? o.spreadDays : null,
       incoming,
       countsAsCredit: incoming && !!o?.countAsCredit,
-      isCash: false,
+      paymentMethod: t.paymentMethod,
+      isCash: t.isAtm || t.paymentMethod === "cash",
       excluded: !!o?.excluded,
       city: t.city ?? cityByDay[date]?.city ?? null,
       notes: o?.notes ?? null,
-      kind: "card",
+      source: t.source,
       internal: t.isAtm,
       isTransfer: t.isTransfer,
-    });
-  }
-  for (const c of cashLogs) {
-    const date = isoOf(new Date(c.occurredAt));
-    if (date < trip.startDate || date > asOf) continue;
-    feed.push({
-      id: c.id,
-      occurredAt: c.occurredAt,
-      date,
-      description: c.note ?? travelCategory(c.travelCategory).label,
-      message: null,
-      aud: round2(c.amountAudCents / 100),
-      foreign: foreignFor(c.foreignAmount, c.foreignCurrency),
-      method: c.kind === "topup" ? "ATM" : "Cash",
-      category: c.travelCategory,
-      upTag: null,
-      bucket: travelBucket(c.travelCategory),
-      isAccom: false,
-      stayId: null,
-      spreadDays: null,
-      incoming: false,
-      countsAsCredit: false,
-      isCash: c.kind === "spend" ? c.isCash : true, // topups are always cash by nature
-      excluded: false,
-      city: c.city ?? cityByDay[date]?.city ?? null,
-      notes: c.note,
-      kind: "cashlog",
-      cashLogKind: c.kind,
-      internal: c.kind === "topup",
-      isTransfer: false,
     });
   }
   feed.sort((a, b) => b.occurredAt - a.occurredAt);
@@ -446,21 +422,8 @@ export function buildBurn(input: BurnInput): BurnState {
       aud: round2(spendDollars(t.amountAudCents)),
       bucket: travelBucket(cat), cat,
       foreign: foreignFor(t.foreignAmount, t.foreignCurrency),
-      method: t.cardPurchaseMethod,
+      method: t.cardPurchaseMethod ?? paymentLabel(t.paymentMethod),
       city: t.city ?? cityByDay[date]?.city ?? "",
-    });
-  }
-  for (const c of cashLogs) {
-    if (c.kind !== "spend") continue;
-    const date = isoOf(new Date(c.occurredAt));
-    if (date < trip.startDate || date > asOf) continue;
-    outliers.push({
-      date, label: c.note ?? travelCategory(c.travelCategory).label,
-      aud: round2(c.amountAudCents / 100),
-      bucket: travelBucket(c.travelCategory), cat: c.travelCategory,
-      foreign: foreignFor(c.foreignAmount, c.foreignCurrency),
-      method: "Cash",
-      city: c.city ?? cityByDay[date]?.city ?? "",
     });
   }
   outliers.sort((a, b) => b.aud - a.aud);
@@ -474,12 +437,12 @@ export function buildBurn(input: BurnInput): BurnState {
     },
     asOf, dayNumber: N, plannedDays, daysLeft,
     isComplete, partialToday,
-    series, todayBurn: todayRow.total, todayRow,
+    series, todayBurn: todayRow.total, todayRow, yesterdayRow,
     avgAll, avg7, avg30, cumulative,
     target, budget, budgetLeft, banked,
     runwayDays, projectedTotal, projectedEnd, finalEnd, safeDaily,
     cashFloat, cityByDay,
-    catBreakdownToday, catBreakdownByWindow,
+    catBreakdownToday, catBreakdownYesterday, catBreakdownByWindow,
     stays: staysView, feed, outliers,
   };
 }

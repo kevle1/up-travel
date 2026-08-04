@@ -1,6 +1,6 @@
 import type {
   BurnState, Trip, TripCreate, TripPatch, Stay, StayCreate, StayPatch,
-  TransactionPatch, CashLog, CashLogCreate,
+  TransactionPatch, ManualSpendCreate,
 } from "@up-travel/shared";
 
 export class HttpError extends Error {
@@ -57,8 +57,13 @@ export const api = {
       http<{ ok: true }>(`/api/trips/${id}`, { method: "DELETE" }),
   },
   transactions: {
+    create: (body: ManualSpendCreate) =>
+      http<{ id: string }>("/api/transactions", { method: "POST", body: JSON.stringify(body) }),
     patch: (id: string, body: TransactionPatch) =>
       http<{ ok: true }>(`/api/transactions/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
+    /** Manual spends only - the API rejects Up-sourced rows. */
+    remove: (id: string) =>
+      http<{ ok: true }>(`/api/transactions/${id}`, { method: "DELETE" }),
     resetOverride: (id: string) =>
       http<{ ok: true }>(`/api/transactions/${id}/override`, { method: "DELETE" }),
   },
@@ -70,12 +75,6 @@ export const api = {
       http<Stay>(`/api/stays/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
     remove: (id: number) =>
       http<{ ok: true }>(`/api/stays/${id}`, { method: "DELETE" }),
-  },
-  cashLogs: {
-    create: (body: CashLogCreate) =>
-      http<CashLog>("/api/cash-logs", { method: "POST", body: JSON.stringify(body) }),
-    remove: (id: string) =>
-      http<{ ok: true }>(`/api/cash-logs/${id}`, { method: "DELETE" }),
   },
   sync: {
     run: (reset = false) =>

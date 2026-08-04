@@ -38,6 +38,8 @@ Glancable dashboard
 
 At the top: how much you've spent today and your 7-day average, each labelled green, amber, or red against your daily target.
 
+Under those, a one-line recap of **yesterday** - what you spent, how far under or over target that landed, and what most of it went on. Early in the day "today so far" is nearly empty, so yesterday is the number that actually tells you how you're travelling.
+
 Below that: how much you're banked (or behind), how much budget is left, where today's spend went by category, a 30-day sparkline, and your **money runway**, how many days your remaining budget lasts at your current pace vs how many days are left in the trip.
 
 When a trip's over, a summary view is shown
@@ -52,7 +54,7 @@ Underneath, the **biggest spends across the whole trip** and a quick calc slider
 
 I found Up's category for travel was too generic. The app serves every transaction in the trip window, also allowing you to filter by category (mm bier)
 
-Tap a spend to:
+Tap any spend - card or hand-logged - to:
 
 - Re-tag from Up's generic category into one of 11 specific ones (Accommodation, Food & Drink, Local Transport, Flights & Intercity, Sights & Activities, Nightlife & Bars, Shopping, Health & Pharmacy, Groceries, Cash, Other).
 - **Mark it as accommodation** and link it to a stay (deposits + balance both get amortised across the nights you sleep there, so the hostel booking doesn't spike one day!!).
@@ -62,6 +64,14 @@ Tap a spend to:
 
 Incoming funds (refunds, salary, transfers) show up too, in green with a `+` prefix. They don't affect burn by default; toggle them on to include them in the spend calcs.
 
+### Log spend
+
+Not everything goes through the Up card. **Log spend** covers the rest: cash, a card Up can't see, a transfer, a bill someone else fronted. Pick the amount, when it happened (Today / Yesterday chips, or any earlier date), what it was for, and how you paid.
+
+It saves as a regular transaction, so it's not a second-class row - tap it in Spend and you get the whole editor: re-tag it, spread it across days, **put it under a stay**, add notes, exclude it. Only the ones you logged yourself can be deleted; Up-sourced rows come back on the next sync, so those get excluded instead.
+
+Only the **Cash** method touches your cash on hand. Card and Other are just spend Up never saw.
+
 ### Stays
 
 I found it a bit annoying to track how much I spent on accomodation as there was the initial booking deposit, and then payment on arrival. I sometimes extended my stay at hostels too, kinda all over the  place.
@@ -70,14 +80,14 @@ Each booking gets its own card with a per-night cost, a row of blocks showing ho
 
 ### Cash
 
-Tracks physical cash. Up-sourced ATM withdrawals fill your "cash on hand"; **Log spend** with the "Paid in cash" toggle on to draw it back down.
+Tracks physical cash. Up-sourced ATM withdrawals fill your "cash on hand"; logging a spend as **Cash** draws it back down.
 
-The withdrawn, spent, on-hand triple always reconciles. Non-cash manual spends live in the Spend tab and don't touch this view.
+The withdrawn, spent, on-hand triple always reconciles. Spends paid any other way live in the Spend tab and don't touch this view. The float tracks notes in your wallet, so excluding a cash spend from your burn totals still counts it as gone.
 
 ## Other cool stuff
 
 - **Sync** runs hourly via a Cloudflare cron and on demand via the **🔄 button** in the top bar. Right-click the button to reset the watermark and pull everything from the trip start. Each spend gets stamped with the city you were in (from the stay covering that day), so it carries through even if stays change later.
-- **CSV export** (download icon, top bar) covers every column you'd want: date, description, AUD amount, foreign amount + currency, travel category, Up category, payment method, city, kind, accommodation flag + stay nights, excluded, incoming, spread days, paid-in-cash, notes.
+- **CSV export** (download icon, top bar) covers every column you'd want: date, description, AUD amount, foreign amount + currency, travel category, Up category, method, city, source (up or manual), accommodation flag + stay nights, excluded, incoming, spread days, payment method, paid-in-cash, notes.
 - **Light, dark, auto** theme via the gear menu.
 - **No webhooks**, no third-party analytics, no telemetry. Your PAT is a Worker secret, your D1 lives on your Cloudflare account, your transaction descriptions never leave your worker.
 

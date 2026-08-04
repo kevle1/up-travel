@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
-import { buildBurn, type Transaction, type TransactionOverride, type Stay, type CashLog, type Trip } from "@up-travel/shared";
-import { transactions, transactionOverrides, stays, cashLogs } from "../db/schema";
+import { buildBurn, type Transaction, type TransactionOverride, type Stay, type PaymentMethod, type Trip } from "@up-travel/shared";
+import { transactions, transactionOverrides, stays } from "../db/schema";
 import { activeTripId, tripById } from "./trips";
 import type { Env } from "../env";
 
@@ -28,11 +28,10 @@ burnRouter.get("/", async (c) => {
   };
 
   const db = drizzle(c.env.DB);
-  const [txnRows, ovRows, stayRows, cashRows] = await Promise.all([
+  const [txnRows, ovRows, stayRows] = await Promise.all([
     db.select().from(transactions).where(eq(transactions.tripId, tripId)),
     db.select().from(transactionOverrides).where(eq(transactionOverrides.tripId, tripId)),
     db.select().from(stays).where(eq(stays.tripId, tripId)),
-    db.select().from(cashLogs).where(eq(cashLogs.tripId, tripId)),
   ]);
 
   const txns: Transaction[] = txnRows.map((r) => ({
@@ -46,6 +45,7 @@ burnRouter.get("/", async (c) => {
     upCategoryParent: r.upCategoryParent,
     upCategoryChild: r.upCategoryChild,
     cardPurchaseMethod: r.cardPurchaseMethod,
+    paymentMethod: (r.paymentMethod ?? null) as PaymentMethod | null,
     city: r.city,
     isTransfer: r.isTransfer === 1,
     isAtm: r.isAtm === 1,
@@ -66,20 +66,7 @@ burnRouter.get("/", async (c) => {
     name: r.name, city: r.city,
     checkIn: r.checkIn, nights: r.nights,
   }));
-  const cashOut: CashLog[] = cashRows.map((r) => ({
-    id: r.id, tripId: r.tripId,
-    kind: r.kind as "spend" | "topup",
-    occurredAt: r.occurredAt,
-    amountAudCents: r.amountAudCents,
-    foreignAmount: r.foreignAmount === null ? null : Number(r.foreignAmount),
-    foreignCurrency: r.foreignCurrency,
-    travelCategory: r.travelCategory,
-    isCash: r.isCash === 1,
-    city: r.city,
-    note: r.note,
-  }));
-
   const asOf = new Date().toISOString().slice(0, 10);
-  const state = buildBurn({ trip, transactions: txns, overrides, stays: staysOut, cashLogs: cashOut, asOf });
+  const state = buildBurn({ trip, transactions: txns, overrides, stays: staysOut, asOf });
   return c.json(state);
 });
