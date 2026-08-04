@@ -177,6 +177,54 @@ describe("manual spends over the API", () => {
     expect(leftover).toBeNull();
   });
 
+  // The Log spend sheet labels itself "In <city>" from the same stay windows.
+  // It shows nothing when no stay covers the day, which is only honest if the
+  // stored city is null in exactly that case - so pin both halves here.
+  it("stamps the city from the stay covering that day, and null when none does", async () => {
+    await call("/api/stays", {
+      method: "POST",
+      body: JSON.stringify({ name: "Gothic Quarter", city: "Barcelona", checkIn: "2025-09-10", nights: 3 }),
+    });
+
+    // Inside the stay window (10th, 11th, 12th - check-out is exclusive).
+    await call("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        amountAudCents: 1800, occurredAt: iso("2025-09-11"),
+        travelCategory: "food", description: "Vermut",
+      }),
+    });
+    // The night you travelled, before any stay covers you.
+    await call("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        amountAudCents: 900, occurredAt: iso("2025-09-09"),
+        travelCategory: "food", description: "Station sandwich",
+      }),
+    });
+
+    const feed = (await burn()).feed;
+    expect(feed.find((r) => r.description === "Vermut")!.city).toBe("Barcelona");
+    expect(feed.find((r) => r.description === "Station sandwich")!.city).toBeNull();
+  });
+
+  it("keeps a stay's city off days it doesn't cover, even mid-trip", async () => {
+    await call("/api/stays", {
+      method: "POST",
+      body: JSON.stringify({ name: "Lisbon flat", city: "Lisbon", checkIn: "2025-09-01", nights: 2 }),
+    });
+    await call("/api/stays", {
+      method: "POST",
+      body: JSON.stringify({ name: "Gothic Quarter", city: "Barcelona", checkIn: "2025-09-05", nights: 2 }),
+    });
+
+    const state = await burn();
+    expect(state.cityByDay["2025-09-01"]?.city).toBe("Lisbon");
+    expect(state.cityByDay["2025-09-05"]?.city).toBe("Barcelona");
+    // The gap between the two bookings belongs to neither.
+    expect(state.cityByDay["2025-09-03"]).toBeUndefined();
+  });
+
   it("refuses to delete an Up-sourced row, which sync would just restore", async () => {
     const tripId = (await burn()).trip.id;
     await env.DB.prepare(

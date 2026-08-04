@@ -435,7 +435,13 @@ export function SpendLogger({ defaultMethod = "card" }: { defaultMethod?: Paymen
   const [description, setDescription] = useState("");
   const [method, setMethod] = useState<PaymentMethod>(defaultMethod);
 
-  const here = burn?.cityByDay[date] ?? { city: burn?.trip.currentCity ?? "" };
+  // Only ever the city of a stay covering the picked date. Deliberately no
+  // fallback to trip.currentCity: that's a static field you set by hand, so on
+  // a multi-city trip it goes stale and would label a back-dated spend with
+  // wherever you are now. The server stamps the row from the same stay windows
+  // and stores null when none covers the day, so a blank subtitle is the
+  // honest signal that the row won't carry a city either.
+  const here = burn?.cityByDay[date]?.city ?? null;
   const numAmount = Number(amount) || 0;
 
   const create = useMutation({
@@ -454,7 +460,7 @@ export function SpendLogger({ defaultMethod = "card" }: { defaultMethod?: Paymen
   return (
     <Sheet
       title="Log spend"
-      subtitle={here.city ? `In ${here.city}` : undefined}
+      subtitle={here ? `In ${here}` : undefined}
       onClose={sheet.close}
     >
       <Field label="Amount · AUD">
