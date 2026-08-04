@@ -63,6 +63,9 @@ export interface FeedRow {
   incoming: boolean;
   /** True if this incoming row was opted in to count against burn. */
   countsAsCredit: boolean;
+  /** Dated after asOf - something booked ahead. Visible and editable, but not
+   *  in any total until its day comes round. */
+  upcoming: boolean;
   /** How a manually-logged spend was paid; null on Up-sourced rows. */
   paymentMethod: PaymentMethod | null;
   /** True when this spend draws from the cash float - physical cash out of the
@@ -355,11 +358,17 @@ export function buildBurn(input: BurnInput): BurnState {
   // ── Feed (Spend tab) ───────────────────────────────────────────────────────
   // One row per transaction, Up-sourced and manually-logged alike, so a spend
   // the user typed in behaves exactly like one Up saw.
-  // Clamp to the trip window. Stay-linked transactions kept regardless so a
-  // pre-trip deposit still appears. Transfers (Up's internal account-to-
-  // account moves) stay hidden - they're not real spend or income. Incoming
-  // amounts (refunds, salary, deposits) are shown so the user can see them
-  // and optionally toggle "count as credit" to apply them against burn.
+  // Clamp to the trip window - the whole window, not just up to asOf, so a
+  // spend logged for a day still to come (a bus booked early) is visible and
+  // editable instead of vanishing until its date arrives. It carries
+  // `upcoming` so the UI can mark it, and the burn loop above already ignores
+  // it: addBucket() only has day slots up to asOf, so it starts counting on
+  // its own day with no extra bookkeeping.
+  // Stay-linked transactions kept regardless so a pre-trip deposit still
+  // appears. Transfers (Up's internal account-to-account moves) stay hidden -
+  // they're not real spend or income. Incoming amounts (refunds, salary,
+  // deposits) are shown so the user can see them and optionally toggle
+  // "count as credit" to apply them against burn.
   const feed: FeedRow[] = [];
   const foreignFor = (amt: number | null, ccy: string | null) =>
     amt != null && ccy ? { value: Math.abs(amt), currencyCode: ccy } : null;
@@ -370,7 +379,7 @@ export function buildBurn(input: BurnInput): BurnState {
     if (t.isTransfer) continue;
     const date = isoOf(new Date(t.occurredAt));
     const linked = accomTxIds.has(t.id);
-    if (!linked && (date < trip.startDate || date > asOf)) continue;
+    if (!linked && (date < trip.startDate || date > trip.endDate)) continue;
     // Stay-linked transactions surface as Accommodation regardless of the
     // user's per-tx travel category override. The override is preserved so
     // unlinking the stay restores the original category cleanly.
@@ -394,6 +403,7 @@ export function buildBurn(input: BurnInput): BurnState {
       spreadDays: o?.spreadDays && o.spreadDays > 1 ? o.spreadDays : null,
       incoming,
       countsAsCredit: incoming && !!o?.countAsCredit,
+      upcoming: date > asOf,
       paymentMethod: t.paymentMethod,
       isCash: t.isAtm || t.paymentMethod === "cash",
       excluded: !!o?.excluded,

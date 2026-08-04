@@ -70,7 +70,16 @@ export function Spend({ burn }: { burn: BurnState }) {
           </Card>
         )}
         {groups.map((g) => {
-          const dayTotal = g.items.filter((x) => !x.internal && !x.isTransfer).reduce((a, x) => a + x.aud, 0);
+          // Mirror what the burn engine counts, so the header agrees with the
+          // rows underneath it: ATM top-ups and transfers never count, excluded
+          // rows drop out, and incoming funds only register - as a credit -
+          // once the user opts in. Without the incoming branch a salary deposit
+          // read as a day of enormous spending.
+          const dayTotal = g.items.reduce((a, x) => {
+            if (x.internal || x.isTransfer || x.excluded) return a;
+            if (x.incoming) return x.countsAsCredit ? a - x.aud : a;
+            return a + x.aud;
+          }, 0);
           return (
             <div key={g.date}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "0 4px 7px" }}>
@@ -104,6 +113,7 @@ function MetaLine({ x, isTopup }: { x: FeedRow; isTopup: boolean }) {
   if (x.isAccom) parts.push({ text: "Stay", color: "var(--c-stay)" });
   if (x.spreadDays) parts.push({ text: `Spread ${x.spreadDays}d`, color: "var(--accent)" });
   if (x.incoming) parts.push({ text: x.countsAsCredit ? "Credit" : "Incoming", color: "var(--good)" });
+  if (x.upcoming) parts.push({ text: "Upcoming", color: "var(--accent)" });
   if (x.source === "manual" && !isTopup) parts.push({ text: "Logged", color: "var(--accent)" });
   if (isTopup) parts.push({ text: "Float top-up" });
   if (parts.length === 0) return null;
@@ -127,14 +137,17 @@ function TxRow({ x, last, onTap }: { x: FeedRow; last: boolean; onTap: () => voi
   const color = isTopup ? "var(--c-cash)"
     : x.incoming ? "var(--good)"
     : travelColor(x.category);
-  // Excluded rows stay in the feed but fade so they read as inactive.
-  const isExcluded = x.excluded;
+  // Anything that doesn't move the burn needle fades out: rows the user
+  // excluded, incoming funds they haven't opted into counting as credit, and
+  // spends booked for a day that hasn't arrived. All still readable and still
+  // tappable, they just stop competing with real spend for attention.
+  const counts = !x.excluded && !x.upcoming && (!x.incoming || x.countsAsCredit);
   return (
     <button onClick={onTap} type="button" style={{
       width: "100%", display: "flex", alignItems: "center", gap: 12, padding: "11px 12px",
       cursor: "pointer", border: 0, borderBottom: last ? "none" : "0.5px solid var(--line)",
       background: "transparent", textAlign: "left",
-      opacity: isExcluded ? 0.45 : 1,
+      opacity: counts ? 1 : 0.45,
     }}>
       <span style={{
         width: 30, height: 30, borderRadius: 8, flexShrink: 0,
@@ -148,7 +161,10 @@ function TxRow({ x, last, onTap }: { x: FeedRow; last: boolean; onTap: () => voi
         <div style={{
           fontSize: 14.5, color: "var(--ink)", fontWeight: 500,
           whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-          textDecoration: isExcluded ? "line-through" : undefined,
+          // Strike-through stays exclusive to excluded rows - it reads as
+          // "struck from the record", which would misdescribe a refund that
+          // genuinely landed and simply isn't counted as burn.
+          textDecoration: x.excluded ? "line-through" : undefined,
         }}>{x.description}</div>
         <MetaLine x={x} isTopup={isTopup} />
       </div>

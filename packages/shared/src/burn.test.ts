@@ -303,6 +303,49 @@ describe("buildBurn - manual spends behave like any other transaction", () => {
   });
 });
 
+describe("buildBurn - spends booked for a future day", () => {
+  const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-30" });
+  const txns: Transaction[] = [
+    manual({ id: "today", occurredAt: ms("2025-09-05"), amountAudCents: -2000 }),
+    manual({ id: "bus", occurredAt: ms("2025-09-12"), amountAudCents: -3500, description: "Flixbus to Girona" }),
+  ];
+  const overrides = [cat("today", "food"), cat("bus", "intercity")];
+  const state = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-05" });
+
+  it("stays visible in the feed rather than vanishing until its date", () => {
+    expect(state.feed.find((r) => r.id === "bus")).toBeDefined();
+  });
+
+  it("is flagged upcoming so the UI can mark it", () => {
+    expect(state.feed.find((r) => r.id === "bus")!.upcoming).toBe(true);
+    expect(state.feed.find((r) => r.id === "today")!.upcoming).toBe(false);
+  });
+
+  it("doesn't touch burn, budget or the day series yet", () => {
+    expect(state.cumulative).toBe(20);
+    expect(state.todayBurn).toBe(20);
+    expect(state.series.some((d) => d.Transport > 0)).toBe(false);
+  });
+
+  it("stays out of the biggest-spends list until it happens", () => {
+    expect(state.outliers.map((o) => o.label)).not.toContain("Flixbus to Girona");
+  });
+
+  it("starts counting on its own day with no further action", () => {
+    const later = buildBurn({ trip, transactions: txns, overrides, stays: noStays, asOf: "2025-09-12" });
+    expect(later.series.find((d) => d.date === "2025-09-12")!.Transport).toBe(35);
+    expect(later.cumulative).toBe(55);
+    expect(later.feed.find((r) => r.id === "bus")!.upcoming).toBe(false);
+    expect(later.outliers.map((o) => o.label)).toContain("Flixbus to Girona");
+  });
+
+  it("still drops anything past the end of the trip", () => {
+    const beyond = [manual({ id: "after", occurredAt: ms("2025-10-15"), amountAudCents: -1000 })];
+    const s = buildBurn({ trip, transactions: beyond, overrides: [], stays: noStays, asOf: "2025-09-05" });
+    expect(s.feed).toHaveLength(0);
+  });
+});
+
 describe("buildBurn - yesterday", () => {
   const trip = makeTrip({ startDate: "2025-09-01", endDate: "2025-09-30" });
   const txns: Transaction[] = [

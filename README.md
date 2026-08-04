@@ -62,11 +62,15 @@ Tap any spend - card or hand-logged - to:
 - **Add notes** that go in your CSV export.
 - **Exclude it** from totals (greyed out but still visible so you can re-include later).
 
-Incoming funds (refunds, salary, transfers) show up too, in green with a `+` prefix. They don't affect burn by default; toggle them on to include them in the spend calcs.
+Incoming funds (refunds, salary, transfers) show up too, in green with a `+` prefix. They don't affect burn by default, so they're greyed out until you flip **Count as credit** on them — same treatment as an excluded row, because the effect on your totals is the same: none. That toggle is the only control on an incoming row; there's no separate exclude button, since it would just be a second switch for the same thing.
+
+Anything that doesn't move your burn reads as inactive: excluded rows, uncounted incoming funds, and spends dated for a day that hasn't arrived. The day totals above each group follow the same rule, so the header always agrees with the rows under it.
 
 ### Log spend
 
-Not everything goes through the Up card. **Log spend** covers the rest: cash, a card Up can't see, a transfer, a bill someone else fronted. Pick the amount, when it happened (Today / Yesterday chips, or any earlier date), what it was for, and how you paid.
+Not everything goes through the Up card. **Log spend** covers the rest: cash, a card Up can't see, a transfer, a bill someone else fronted. Pick the amount, when it happened, what it was for, and how you paid.
+
+The date goes both ways. Today / Yesterday chips for the usual "forgot to log it" case, any earlier date for catching up on the week, and **any day still to come** for something you've booked ahead — a bus ticket bought early, a tour paid up front. An upcoming spend is saved and visible straight away, marked *Upcoming* and greyed out, and starts counting toward your burn on its own day without you touching it again. Dates are held to the trip window, since a row outside it wouldn't appear anywhere.
 
 It saves as a regular transaction, so it's not a second-class row - tap it in Spend and you get the whole editor: re-tag it, spread it across days, **put it under a stay**, add notes, exclude it. Only the ones you logged yourself can be deleted; Up-sourced rows come back on the next sync, so those get excluded instead.
 

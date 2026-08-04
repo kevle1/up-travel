@@ -146,6 +146,13 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
       <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 9, lineHeight: 1.5 }}>
         Link this to a stay and it stops counting as a lump. Its amount joins the stay's total and spreads evenly across the nights.
       </div>
+      {/* On incoming rows the "Count as credit" toggle above is already the
+          switch that decides whether the amount touches burn, so an exclude
+          button beside it is a second control for the same job - and one that
+          silently wins over the toggle. An incoming row that was excluded
+          before this rule existed still gets the include button, so nobody is
+          stranded with a row they can't reactivate. */}
+      {(!tx.incoming || tx.excluded) && (
       <div style={{ marginTop: 16 }}>
         {tx.excluded ? (
           <button
@@ -184,6 +191,7 @@ export function TxEditor({ tx: initialTx }: { tx: FeedRow }) {
           </button>
         )}
       </div>
+      )}
       {/* Up-sourced rows come back on the next sync, so only manual spends can
           actually go away. */}
       {manual && (
@@ -471,7 +479,8 @@ export function SpendLogger({ defaultMethod = "card" }: { defaultMethod?: Paymen
         />
       </Field>
       <Field label="When">
-        <DayPicker value={date} onChange={setDate} today={todayIso} />
+        <DayPicker value={date} onChange={setDate} today={todayIso}
+          min={burn?.trip.startDate} max={burn?.trip.endDate} />
       </Field>
       <Field label="Paid with">
         <PaymentPicker value={method} onChange={setMethod} />
@@ -490,32 +499,50 @@ export function SpendLogger({ defaultMethod = "card" }: { defaultMethod?: Paymen
   );
 }
 
-// Date field with Today/Yesterday shortcuts. The plain date input stays for
-// anything older, which is the "I'm catching up on the week" case.
-function DayPicker({ value, onChange, today }: {
+// Date field with Today/Yesterday shortcuts; the input covers everything else,
+// in both directions - catching up on last week, or booking something ahead
+// like a bus ticket bought early.
+//
+// Bounded to the trip window on purpose. The feed only renders rows inside it,
+// so a date outside would save and then be invisible, which reads as the app
+// having eaten it. The Yesterday chip drops away on day one for the same
+// reason - it would point at a day before the trip started.
+function DayPicker({ value, onChange, today, min, max }: {
   value: string; onChange: (iso: string) => void; today: string;
+  min?: string; max?: string;
 }) {
-  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-  const chips: { label: string; iso: string }[] = [
+  const shift = (iso: string, days: number) =>
+    new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
+  const inRange = (iso: string) => (!min || iso >= min) && (!max || iso <= max);
+  const chips = [
     { label: "Today", iso: today },
-    { label: "Yesterday", iso: yesterday },
-  ];
+    { label: "Yesterday", iso: shift(today, -1) },
+  ].filter((c) => inRange(c.iso));
+  const future = value > today;
+
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      {chips.map((c) => {
-        const on = value === c.iso;
-        return (
-          <button key={c.iso} type="button" onClick={() => onChange(c.iso)} style={{
-            flexShrink: 0, cursor: "pointer", whiteSpace: "nowrap",
-            borderRadius: 12, padding: "12px 13px", fontSize: 13.5, fontWeight: 600,
-            border: on ? "1.5px solid var(--accent)" : "1px solid var(--line)",
-            background: on ? "var(--accent-wash)" : "var(--surface)",
-            color: on ? "var(--accent)" : "var(--ink-2)",
-          }}>{c.label}</button>
-        );
-      })}
-      <input type="date" max={today} style={{ ...inputStyle, flex: 1, minWidth: 0 }}
-        value={value} onChange={(e) => onChange(e.target.value)} />
+    <div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {chips.map((c) => {
+          const on = value === c.iso;
+          return (
+            <button key={c.iso} type="button" onClick={() => onChange(c.iso)} style={{
+              flexShrink: 0, cursor: "pointer", whiteSpace: "nowrap",
+              borderRadius: 12, padding: "12px 13px", fontSize: 13.5, fontWeight: 600,
+              border: on ? "1.5px solid var(--accent)" : "1px solid var(--line)",
+              background: on ? "var(--accent-wash)" : "var(--surface)",
+              color: on ? "var(--accent)" : "var(--ink-2)",
+            }}>{c.label}</button>
+          );
+        })}
+        <input type="date" min={min} max={max} style={{ ...inputStyle, flex: 1, minWidth: 0 }}
+          value={value} onChange={(e) => onChange(e.target.value)} />
+      </div>
+      {future && (
+        <div style={{ fontSize: 11.5, color: "var(--accent)", marginTop: 7, lineHeight: 1.45 }}>
+          Upcoming · saved now, starts counting toward your burn on {fmtDate(value)}
+        </div>
+      )}
     </div>
   );
 }
