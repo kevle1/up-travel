@@ -225,6 +225,61 @@ describe("manual spends over the API", () => {
     expect(state.cityByDay["2025-09-03"]).toBeUndefined();
   });
 
+  it("holds a category out of the pace maths but not off the budget", async () => {
+    const tripId = (await burn()).trip.id;
+    await call("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        amountAudCents: 40000, occurredAt: iso("2025-09-04"),
+        travelCategory: "intercity", description: "Vueling to Palma",
+      }),
+    });
+    await call("/api/transactions", {
+      method: "POST",
+      body: JSON.stringify({
+        amountAudCents: 11000, occurredAt: iso("2025-09-04"), travelCategory: "food",
+      }),
+    });
+
+    const before = await burn();
+    expect(before.series.find((d) => d.date === "2025-09-04")!.total).toBe(510);
+    expect(before.offPaceTotal).toBe(0);
+
+    await call(`/api/trips/${tripId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ paceExcludedCategories: ["intercity"] }),
+    });
+
+    const after = await burn();
+    expect(after.trip.paceExcludedCategories).toEqual(["intercity"]);
+    expect(after.series.find((d) => d.date === "2025-09-04")!.total).toBe(110);
+    expect(after.offPaceTotal).toBe(400);
+    // The money still left the account, so the budget position is unchanged.
+    expect(after.budgetLeft).toBe(before.budgetLeft);
+    expect(after.feed.find((r) => r.description === "Vueling to Palma")!.offPace).toBe(true);
+  });
+
+  it("round-trips the setting off again", async () => {
+    const tripId = (await burn()).trip.id;
+    await call(`/api/trips/${tripId}`, {
+      method: "PATCH", body: JSON.stringify({ paceExcludedCategories: ["intercity"] }),
+    });
+    await call(`/api/trips/${tripId}`, {
+      method: "PATCH", body: JSON.stringify({ paceExcludedCategories: [] }),
+    });
+    expect((await burn()).trip.paceExcludedCategories).toEqual([]);
+  });
+
+  it("defaults to empty on a trip made before the column existed", async () => {
+    // Simulates the ALTER TABLE backfill: existing rows get ''.
+    const tripId = (await burn()).trip.id;
+    await env.DB.prepare(`UPDATE trips SET pace_excluded_categories = '' WHERE id = ?1`)
+      .bind(tripId).run();
+    const state = await burn();
+    expect(state.trip.paceExcludedCategories).toEqual([]);
+    expect(state.offPaceTotal).toBe(0);
+  });
+
   it("refuses to delete an Up-sourced row, which sync would just restore", async () => {
     const tripId = (await burn()).trip.id;
     await env.DB.prepare(

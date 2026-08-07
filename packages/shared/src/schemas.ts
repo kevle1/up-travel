@@ -11,6 +11,12 @@ export const TripSchema = z.object({
   budgetAudCents: z.number().int().nonnegative(),
   targetDailyAudCents: z.number().int().nonnegative(),
   currentCity: z.string(), // optional but always present (empty string when blank)
+  /** Travel categories held out of the daily-pace maths: their spend doesn't
+   *  reach the day series, averages or target comparison, but it's still real
+   *  money so it stays in cumulative, budget left and runway. Aimed at lumpy
+   *  intercity travel, where one $400 flight would otherwise read as a blown
+   *  day. Empty by default. */
+  paceExcludedCategories: z.array(z.string()),
   isActive: z.boolean(),
   createdAt: z.number().int(),
   archivedAt: z.number().int().nullable(),
@@ -34,6 +40,7 @@ export const TripPatchSchema = z.object({
   budgetAudCents: z.number().int().nonnegative().optional(),
   targetDailyAudCents: z.number().int().nonnegative().optional(),
   currentCity: z.string().optional(),
+  paceExcludedCategories: z.array(z.string()).optional(),
 });
 export type TripPatch = z.infer<typeof TripPatchSchema>;
 

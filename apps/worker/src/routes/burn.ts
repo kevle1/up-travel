@@ -3,7 +3,7 @@ import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
 import { buildBurn, type Transaction, type TransactionOverride, type Stay, type PaymentMethod, type Trip } from "@up-travel/shared";
 import { transactions, transactionOverrides, stays } from "../db/schema";
-import { activeTripId, tripById } from "./trips";
+import { activeTripId, splitCats, tripById } from "./trips";
 import type { Env } from "../env";
 
 export const burnRouter = new Hono<{ Bindings: Env }>();
@@ -22,6 +22,7 @@ burnRouter.get("/", async (c) => {
     budgetAudCents: row.budgetAudCents,
     targetDailyAudCents: row.targetDailyAudCents,
     currentCity: row.currentCity,
+    paceExcludedCategories: splitCats(row.paceExcludedCategories),
     isActive: row.isActive === 1,
     createdAt: row.createdAt,
     archivedAt: row.archivedAt,

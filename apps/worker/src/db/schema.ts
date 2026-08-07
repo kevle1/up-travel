@@ -9,6 +9,10 @@ export const trips = sqliteTable("trips", {
   budgetAudCents: integer("budget_aud_cents").notNull(),
   targetDailyAudCents: integer("target_daily_aud_cents").notNull(),
   currentCity: text("current_city").notNull().default(""),
+  // Comma-separated travel category ids held out of the daily-pace maths.
+  // Stored as one column rather than a join table - it's a handful of short
+  // ids per trip, none of which contain a comma.
+  paceExcludedCategories: text("pace_excluded_categories").notNull().default(""),
   isActive: integer("is_active").notNull(),
   createdAt: integer("created_at").notNull(),
   archivedAt: integer("archived_at"),

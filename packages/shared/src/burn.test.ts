@@ -4,6 +4,10 @@ import type { Trip, Transaction, TransactionOverride, Stay } from "./schemas";
 
 // Helpers ─────────────────────────────────────────────────────────────────────
 const ms = (iso: string, hour = 12) => Date.parse(`${iso}T${String(hour).padStart(2, "0")}:00:00Z`);
+const sept = (day: number) => `2025-09-${String(day).padStart(2, "0")}`;
+// buildBurn rounds every money figure to cents; expectations built by hand
+// have to do the same or they drift on thirds.
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 function makeTrip(over: Partial<Trip> = {}): Trip {
   return {
@@ -12,6 +16,7 @@ function makeTrip(over: Partial<Trip> = {}): Trip {
     budgetAudCents: 14_000_00, // A$14,000
     targetDailyAudCents: 200_00, // A$200/day
     currentCity: "Lisbon",
+    paceExcludedCategories: [],
     isActive: true, createdAt: 0, archivedAt: null,
     ...over,
   };
@@ -300,6 +305,96 @@ describe("buildBurn - manual spends behave like any other transaction", () => {
     });
     expect(s.outliers[0]!.label).toBe("Boat day");
     expect(s.outliers[0]!.aud).toBe(300);
+  });
+});
+
+describe("buildBurn - categories held out of the daily pace", () => {
+  // 10 days in, $200/day target, $6,000 budget. $1,100 of ordinary spend plus
+  // one $400 flight - the worked example behind the setting.
+  const trip = makeTrip({
+    startDate: "2025-09-01", endDate: "2025-09-30",
+    budgetAudCents: 6_000_00, targetDailyAudCents: 200_00,
+    paceExcludedCategories: ["intercity"],
+  });
+  const txns: Transaction[] = [
+    ...Array.from({ length: 10 }, (_, i) =>
+      tx({ id: `d${i}`, occurredAt: ms(sept(i + 1)), amountAudCents: -110_00 })),
+    tx({ id: "flight", occurredAt: ms("2025-09-04"), amountAudCents: -400_00, upCategoryChild: "holidays-and-travel" }),
+  ];
+  const on = buildBurn({ trip, transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-10" });
+  const off = buildBurn({
+    trip: { ...trip, paceExcludedCategories: [] },
+    transactions: txns, overrides: noOverrides, stays: noStays, asOf: "2025-09-10",
+  });
+
+  it("keeps the flight off the day it landed on", () => {
+    expect(off.series.find((d) => d.date === "2025-09-04")!.total).toBe(510);
+    expect(on.series.find((d) => d.date === "2025-09-04")!.total).toBe(110);
+  });
+
+  it("leaves the averages reading the real daily pace", () => {
+    expect(on.avgAll).toBe(110);
+    expect(on.avg7).toBe(110);
+    expect(off.avgAll).toBeGreaterThan(110); // the flight drags it up
+  });
+
+  it("still takes the money off the budget", () => {
+    expect(on.offPaceTotal).toBe(400);
+    expect(on.cumulative).toBe(1500);
+    expect(on.budgetLeft).toBe(4500);
+    // Same budget position either way - only the pace maths differ.
+    expect(on.budgetLeft).toBe(off.budgetLeft);
+    expect(on.cumulative).toBe(off.cumulative);
+  });
+
+  it("runs the runway off the honest pace against the reduced budget", () => {
+    expect(on.runwayDays).toBe(Math.round(4500 / 110));
+  });
+
+  it("adds already-spent off-pace money back into the projection", () => {
+    expect(on.projectedTotal).toBe(round2(110 * 30 + 400));
+  });
+
+  it("banked compares the pace against target, ignoring the flight", () => {
+    // These dates are all in the past, so partialToday is false and all 10
+    // days count as complete: 10 x $200 target, less the $110/day actually
+    // spent. The $400 flight doesn't eat into it.
+    expect(on.banked).toBe(round2(10 * 200 - 10 * 110));
+    expect(off.banked).toBe(round2(10 * 200 - (10 * 110 + 400)));
+  });
+
+  it("drops the flight from the day-by-day category breakdown", () => {
+    expect(on.catBreakdownByWindow.all.items.map((i) => i.cat)).not.toContain("intercity");
+    expect(off.catBreakdownByWindow.all.items.map((i) => i.cat)).toContain("intercity");
+  });
+
+  it("keeps the row in the feed, flagged rather than hidden", () => {
+    const row = on.feed.find((r) => r.id === "flight")!;
+    expect(row.offPace).toBe(true);
+    expect(row.excluded).toBe(false);
+    expect(on.feed.find((r) => r.id === "d0")!.offPace).toBe(false);
+  });
+
+  it("doesn't count a flight booked for a day still ahead", () => {
+    const ahead = [tx({ id: "later", occurredAt: ms("2025-09-20"), amountAudCents: -300_00, upCategoryChild: "holidays-and-travel" })];
+    const s = buildBurn({ trip, transactions: ahead, overrides: noOverrides, stays: noStays, asOf: "2025-09-10" });
+    expect(s.offPaceTotal).toBe(0);
+    expect(s.budgetLeft).toBe(6000);
+    expect(s.feed.find((r) => r.id === "later")!.upcoming).toBe(true);
+  });
+
+  it("honours a per-transaction re-tag into the excluded category", () => {
+    const rows = [tx({ id: "bus", occurredAt: ms("2025-09-02"), amountAudCents: -90_00 })];
+    const s = buildBurn({
+      trip, transactions: rows, overrides: [cat("bus", "intercity")], stays: noStays, asOf: "2025-09-10",
+    });
+    expect(s.offPaceTotal).toBe(90);
+    expect(s.series.find((d) => d.date === "2025-09-02")!.total).toBe(0);
+  });
+
+  it("changes nothing when the trip excludes no categories", () => {
+    expect(off.offPaceTotal).toBe(0);
+    expect(off.cumulative).toBe(round2(off.series.reduce((a, d) => a + d.total, 0)));
   });
 });
 

@@ -14,6 +14,7 @@ export default [
     budget_aud_cents integer NOT NULL,
     target_daily_aud_cents integer NOT NULL,
     current_city text DEFAULT '' NOT NULL,
+    pace_excluded_categories text DEFAULT '' NOT NULL,
     is_active integer NOT NULL,
     created_at integer NOT NULL,
     archived_at integer

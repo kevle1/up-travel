@@ -32,6 +32,14 @@ Click the header dropdown to switch between trips.
 
 Each trip keeps its own budget, dates, current city, transactions, stays, cash logs and category overrides. Trip settings lets you edit budget and target, archive. Completed trips are archived for reference.
 
+### Keeping flights out of your pace
+
+One $400 hop reads as a blown day on a $200 target, then drags your 7-day average behind it for a week. Trip settings has a **Keep out of daily pace** toggle for Flights & Intercity.
+
+Switched on, that spend leaves the day chart, the averages, the target comparison and the category breakdown — but **Budget left, runway and your projected finish still account for it**, because the money genuinely went. Your pace reads true and your budget reads true at the same time. The rows stay in Spend, tagged *Off pace* rather than greyed, since they do still count somewhere. Today's Budget left tile shows the off-pace total alongside it so it never goes invisible.
+
+Re-tagging a single transaction into Flights & Intercity moves it off pace too, so a long-distance bus tagged by hand behaves like a booked flight.
+
 ### Today View
 
 Glancable dashboard

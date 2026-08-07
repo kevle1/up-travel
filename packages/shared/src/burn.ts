@@ -66,6 +66,9 @@ export interface FeedRow {
   /** Dated after asOf - something booked ahead. Visible and editable, but not
    *  in any total until its day comes round. */
   upcoming: boolean;
+  /** Category is held out of the daily-pace maths for this trip. Still counts
+   *  against the budget, so this is a label rather than a "doesn't count". */
+  offPace: boolean;
   /** How a manually-logged spend was paid; null on Up-sourced rows. */
   paymentMethod: PaymentMethod | null;
   /** True when this spend draws from the cash float - physical cash out of the
@@ -116,7 +119,7 @@ export interface OutlierRow {
 }
 
 export interface BurnState {
-  trip: { id: number; name: string; startDate: string; endDate: string; currentCity: string; budgetAudCents: number; targetDailyAudCents: number };
+  trip: { id: number; name: string; startDate: string; endDate: string; currentCity: string; budgetAudCents: number; targetDailyAudCents: number; paceExcludedCategories: string[] };
   asOf: string;
   dayNumber: number;
   plannedDays: number;
@@ -131,7 +134,12 @@ export interface BurnState {
   avgAll: number;
   avg7: number;
   avg30: number;
+  /** Everything spent so far: the day series plus any pace-excluded spend. */
   cumulative: number;
+  /** Spend held out of the day series by trip.paceExcludedCategories, up to
+   *  asOf. Off the pace maths, still off the budget - so
+   *  cumulative = sum(series) + offPaceTotal. 0 when nothing is excluded. */
+  offPaceTotal: number;
   target: number; // dollars/day
   budget: number; // dollars
   budgetLeft: number;
@@ -242,6 +250,14 @@ export function buildBurn(input: BurnInput): BurnState {
     return upToTravel(t.upCategoryChild);
   };
 
+  // Categories the user has held out of the pace maths (e.g. Flights &
+  // Intercity). Their spend skips the day series - and so the averages, the
+  // target comparison and the breakdowns - but lands in offPaceTotal, because
+  // the money did leave the account and the budget has to know that.
+  const offPaceCats = new Set(trip.paceExcludedCategories);
+  const withinWindow = (k: string) => k >= trip.startDate && k <= asOf;
+  let offPaceTotal = 0;
+
   for (const t of transactions) {
     if (t.isTransfer) continue;
     if (t.isAtm) continue; // ATM = float top-up, not burn
@@ -256,6 +272,13 @@ export function buildBurn(input: BurnInput): BurnState {
     const bucket = travelBucket(cat);
     const full = spendDollars(t.amountAudCents);
     const startKey = isoOf(new Date(t.occurredAt));
+    // Spreading is a pacing device, so it's moot here - an off-pace spend
+    // lands whole, on the day the money actually went, or not yet at all if
+    // that day is still ahead.
+    if (offPaceCats.has(cat)) {
+      if (withinWindow(startKey)) offPaceTotal = round2(offPaceTotal + full);
+      continue;
+    }
     // Optional spread: amortise across N days starting at occurredAt. Useful
     // for things like a 5-day transport pass where the lump-sum charge isn't
     // representative of single-day burn. Spread days that fall after asOf
@@ -273,20 +296,35 @@ export function buildBurn(input: BurnInput): BurnState {
     }
   }
 
-  // Stays: amortise total across their nights
+  // Stays: amortise total across their nights. Same off-pace rule as above if
+  // the user ever holds accommodation out - the nights already slept still
+  // count against the budget, they just leave the day series alone.
+  const stayOffPace = offPaceCats.has("accommodation");
   for (const s of staysView) {
     if (!s.perNight) continue;
     for (let d = toDate(s.checkIn).getTime(); d < toDate(s.checkOut).getTime(); d += MS_DAY) {
       const k = isoOf(new Date(d));
       if (k > asOf) break;
-      addBucket(k, "Stay", s.perNight, "accommodation");
+      if (stayOffPace) {
+        if (withinWindow(k)) offPaceTotal = round2(offPaceTotal + s.perNight);
+      } else {
+        addBucket(k, "Stay", s.perNight, "accommodation");
+      }
     }
   }
 
   const series = dayKeys.map((k) => daily[k]!);
   const N = series.length;
   const todayRow = series[N - 1]!;
-  const cumulative = round2(series.reduce((a, r) => a + r.total, 0));
+  // Two notions of "spent" from here on, and the split is the whole point of
+  // paceExcludedCategories:
+  //   paceSpend  - the day series. Drives the averages, the target
+  //                comparison and banked, so one lumpy flight can't read as
+  //                a blown day.
+  //   cumulative - paceSpend + offPaceTotal. Real money out, so it's what
+  //                budget left, runway and the final result are built on.
+  const paceSpend = round2(series.reduce((a, r) => a + r.total, 0));
+  const cumulative = round2(paceSpend + offPaceTotal);
   const completed = partialToday ? series.slice(0, -1) : series;
   const cumCompleted = round2(completed.reduce((a, r) => a + r.total, 0));
   const completedDays = Math.max(1, completed.length);
@@ -307,7 +345,10 @@ export function buildBurn(input: BurnInput): BurnState {
   const budgetLeft = round2(budget - cumulative);
   const daysLeft = Math.max(0, plannedDays - N);
   const runwayDays = avgAll > 0 ? Math.round(budgetLeft / avgAll) : null;
-  const projectedTotal = round2(avgAll * plannedDays);
+  // Project the daily pace forward, then add back the off-pace money already
+  // spent. Future flights are unknowable, so this is "what the trip costs if
+  // the rest of it looks like the days so far".
+  const projectedTotal = round2(avgAll * plannedDays + offPaceTotal);
   const projectedEnd = round2(budget - projectedTotal);
   const finalEnd = round2(budget - cumulative);
   const safeDaily = daysLeft > 0 ? round2(budgetLeft / daysLeft) : 0;
@@ -404,6 +445,7 @@ export function buildBurn(input: BurnInput): BurnState {
       incoming,
       countsAsCredit: incoming && !!o?.countAsCredit,
       upcoming: date > asOf,
+      offPace: offPaceCats.has(cat),
       paymentMethod: t.paymentMethod,
       isCash: t.isAtm || t.paymentMethod === "cash",
       excluded: !!o?.excluded,
@@ -444,11 +486,12 @@ export function buildBurn(input: BurnInput): BurnState {
       id: trip.id, name: trip.name,
       startDate: trip.startDate, endDate: trip.endDate, currentCity: trip.currentCity,
       budgetAudCents: trip.budgetAudCents, targetDailyAudCents: trip.targetDailyAudCents,
+      paceExcludedCategories: [...trip.paceExcludedCategories],
     },
     asOf, dayNumber: N, plannedDays, daysLeft,
     isComplete, partialToday,
     series, todayBurn: todayRow.total, todayRow, yesterdayRow,
-    avgAll, avg7, avg30, cumulative,
+    avgAll, avg7, avg30, cumulative, offPaceTotal,
     target, budget, budgetLeft, banked,
     runwayDays, projectedTotal, projectedEnd, finalEnd, safeDaily,
     cashFloat, cityByDay,

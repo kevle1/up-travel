@@ -76,7 +76,7 @@ export function Spend({ burn }: { burn: BurnState }) {
           // once the user opts in. Without the incoming branch a salary deposit
           // read as a day of enormous spending.
           const dayTotal = g.items.reduce((a, x) => {
-            if (x.internal || x.isTransfer || x.excluded) return a;
+            if (x.internal || x.isTransfer || x.excluded || x.offPace) return a;
             if (x.incoming) return x.countsAsCredit ? a - x.aud : a;
             return a + x.aud;
           }, 0);
@@ -114,6 +114,9 @@ function MetaLine({ x, isTopup }: { x: FeedRow; isTopup: boolean }) {
   if (x.spreadDays) parts.push({ text: `Spread ${x.spreadDays}d`, color: "var(--accent)" });
   if (x.incoming) parts.push({ text: x.countsAsCredit ? "Credit" : "Incoming", color: "var(--good)" });
   if (x.upcoming) parts.push({ text: "Upcoming", color: "var(--accent)" });
+  // Not faded like the others: it's off the pace maths but still off the
+  // budget, so it isn't a row that "doesn't count" - it just counts elsewhere.
+  if (x.offPace) parts.push({ text: "Off pace", color: "var(--c-transport)" });
   if (x.source === "manual" && !isTopup) parts.push({ text: "Logged", color: "var(--accent)" });
   if (isTopup) parts.push({ text: "Float top-up" });
   if (parts.length === 0) return null;

@@ -14,10 +14,16 @@ function rowToApi(r: typeof trips.$inferSelect) {
     budgetAudCents: r.budgetAudCents,
     targetDailyAudCents: r.targetDailyAudCents,
     currentCity: r.currentCity,
+    paceExcludedCategories: splitCats(r.paceExcludedCategories),
     isActive: r.isActive === 1,
     createdAt: r.createdAt,
     archivedAt: r.archivedAt,
   };
+}
+
+/** Stored comma-separated; "" means none, and split("") would yield [""]. */
+export function splitCats(raw: string | null | undefined): string[] {
+  return raw ? raw.split(",").filter(Boolean) : [];
 }
 
 tripsRouter.get("/", async (c) => {
@@ -58,6 +64,10 @@ tripsRouter.patch("/:id", async (c) => {
   if (body.budgetAudCents !== undefined) updates.budgetAudCents = body.budgetAudCents;
   if (body.targetDailyAudCents !== undefined) updates.targetDailyAudCents = body.targetDailyAudCents;
   if (body.currentCity !== undefined) updates.currentCity = body.currentCity;
+  if (body.paceExcludedCategories !== undefined) {
+    // De-duped and comma-joined; a category id can't contain a comma.
+    updates.paceExcludedCategories = [...new Set(body.paceExcludedCategories)].join(",");
+  }
   if (Object.keys(updates).length === 0) return c.json({ ok: true });
   const [row] = await db.update(trips).set(updates).where(eq(trips.id, id)).returning();
   if (!row) return c.json({ error: "not found" }, 404);

@@ -9,7 +9,8 @@ import { useSheet } from "../lib/sheet";
 import { useToast } from "../lib/toast";
 import { money0, money2, fmtDate } from "../lib/format";
 import { Num } from "./ui";
-import { Sheet, BigButton, Field, inputStyle, CategoryInline, Stepper } from "./sheets";
+import { Sheet, BigButton, Field, inputStyle, CategoryInline, Stepper, travelCategory } from "./sheets";
+import { CategoryIcon } from "./CategoryIcon";
 import { Icon } from "./Icon";
 
 // ── Transaction editor ────────────────────────────────────────────────────────
@@ -693,6 +694,60 @@ export function TripCreator() {
   );
 }
 
+// Hold a category out of the daily-pace maths. Only Flights & Intercity is
+// surfaced - it's the one that reliably wrecks a burn rate, since a single
+// $400 hop reads as a blown day on a $200 target and then drags the 7-day
+// average behind it for a week. The trip stores a list rather than a boolean,
+// so opening this up to other categories later needs no migration.
+const PACE_EXCLUDABLE = ["intercity"] as const;
+
+function PaceExclusion({ value, onChange }: {
+  value: string[]; onChange: (next: string[]) => void;
+}) {
+  const toggle = (id: string, on: boolean) =>
+    onChange(on ? [...new Set([...value, id])] : value.filter((c) => c !== id));
+
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--ink-2)", marginBottom: 8, textTransform: "uppercase", letterSpacing: ".04em" }}>
+        Keep out of daily pace
+      </div>
+      {PACE_EXCLUDABLE.map((id) => {
+        const on = value.includes(id);
+        const c = travelCategory(id);
+        return (
+          <div key={id} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+            padding: "12px 14px", borderRadius: 12, background: "var(--chip)",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <span style={{
+                width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                background: `${c.color}1f`, color: c.color,
+              }}>
+                <CategoryIcon cat={id} size={15} />
+              </span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>{c.label}</div>
+                <div style={{ fontSize: 11.5, color: "var(--ink-2)", marginTop: 2, lineHeight: 1.4 }}>
+                  {on
+                    ? "Off your daily burn and averages - still comes out of your budget"
+                    : "Counted like any other spend"}
+                </div>
+              </div>
+            </div>
+            <Toggle value={on} onChange={(v) => toggle(id, v)} />
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 9, lineHeight: 1.5 }}>
+        One big hop shouldn't read as a blown day. Excluded spend leaves the day chart, the 7-day average and the target comparison, but Budget left and your runway still account for it - the money did go.
+      </div>
+    </div>
+  );
+}
+
 export function TripSettings({ trip }: { trip: Trip }) {
   const sheet = useSheet();
   const toast = useToast();
@@ -700,11 +755,13 @@ export function TripSettings({ trip }: { trip: Trip }) {
   const [budget, setBudget] = useState(trip.budgetAudCents);
   const [target, setTarget] = useState(trip.targetDailyAudCents);
   const [currentCity, setCurrentCity] = useState(trip.currentCity);
+  const [paceExcluded, setPaceExcluded] = useState<string[]>(trip.paceExcludedCategories);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const save = useMutation({
     mutationFn: () => api.trips.patch(trip.id, {
       budgetAudCents: budget, targetDailyAudCents: target, currentCity,
+      paceExcludedCategories: paceExcluded,
     }),
     onSuccess: () => { qc.invalidateQueries(); sheet.close(); },
   });
@@ -748,6 +805,9 @@ export function TripSettings({ trip }: { trip: Trip }) {
       <div style={{ fontSize: 12, color: "var(--ink-3)", marginBottom: 18 }}>
         {money0((budgetK * 1000) / days)}/day to spend the whole budget over the trip.
       </div>
+
+      <PaceExclusion value={paceExcluded} onChange={setPaceExcluded} />
+
       <div style={{ display: "flex", gap: 10, marginBottom: 14 }}>
         <BigButton onClick={() => save.mutate()} disabled={save.isPending}>Save</BigButton>
       </div>

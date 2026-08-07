@@ -13,6 +13,7 @@ let ensured = false;
 // data if it runs against a table that already has the column.
 const ADD_COLUMNS = [
   `ALTER TABLE transactions ADD COLUMN payment_method text`,
+  `ALTER TABLE trips ADD COLUMN pace_excluded_categories text DEFAULT '' NOT NULL`,
 ];
 
 export async function ensureSchema(db: D1Database): Promise<void> {

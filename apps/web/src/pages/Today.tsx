@@ -45,7 +45,16 @@ export function Today({ burn }: { burn: BurnState }) {
           color={bankedPos ? "var(--good)" : "var(--over)"}
           sub={`${money0(burn.target)}/day line`}
         />
-        <StatTile label="Budget left" value={money0(burn.budgetLeft)} sub={`of ${money0(burn.budget)}`} />
+        {/* Off-pace spend leaves the day chart and the category breakdown, so
+            without this line it would be invisible everywhere but the feed -
+            even though it's already been taken off the budget. */}
+        <StatTile
+          label="Budget left"
+          value={money0(burn.budgetLeft)}
+          sub={burn.offPaceTotal > 0
+            ? `of ${money0(burn.budget)} · ${money0(burn.offPaceTotal)} off pace`
+            : `of ${money0(burn.budget)}`}
+        />
       </div>
 
       <Card pad={16}>
