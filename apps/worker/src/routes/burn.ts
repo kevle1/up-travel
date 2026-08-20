@@ -8,6 +8,17 @@ import type { Env } from "../env";
 
 export const burnRouter = new Hono<{ Bindings: Env }>();
 
+/** foreign_amount is a NUMERIC column, but rows written before the base-units
+ *  fix can hold the text "NaN" - SQLite keeps a value it can't coerce as text.
+ *  Read those as "no foreign amount" so they drop out of the UI instead of
+ *  surfacing as 0. A full re-sync (right-click the sync button) refetches the
+ *  real figures from Up. */
+function finiteOrNull(v: string | number | null): number | null {
+  if (v === null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
 // GET /api/burn?tripId=42  → BurnState for that trip, or the active trip if omitted.
 burnRouter.get("/", async (c) => {
   const requested = c.req.query("tripId");
@@ -40,7 +51,7 @@ burnRouter.get("/", async (c) => {
     source: r.source as "up" | "manual",
     occurredAt: r.occurredAt,
     amountAudCents: r.amountAudCents,
-    foreignAmount: r.foreignAmount === null ? null : Number(r.foreignAmount),
+    foreignAmount: finiteOrNull(r.foreignAmount),
     foreignCurrency: r.foreignCurrency,
     description: r.description,
     upCategoryParent: r.upCategoryParent,

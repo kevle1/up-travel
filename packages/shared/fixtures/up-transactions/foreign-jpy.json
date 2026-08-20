@@ -5,7 +5,7 @@
     "rawText": "MERCHANT_JPY",
     "description": "Merchant JPY",
     "amount": { "value": "-15.00", "valueInBaseUnits": -1500, "currencyCode": "AUD" },
-    "foreignAmount": { "value": "-1500", "valueInBaseUnits": -150000, "currencyCode": "JPY" },
+    "foreignAmount": { "value": "-1500", "valueInBaseUnits": -1500, "currencyCode": "JPY" },
     "createdAt": "2025-09-20T14:00:00+09:00"
   },
   "relationships": {

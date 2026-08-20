@@ -5,7 +5,7 @@
     "rawText": "ATM CASH WITHDRAWAL JAPAN",
     "description": "ATM Withdrawal",
     "amount": { "value": "-300.00", "valueInBaseUnits": -30000, "currencyCode": "AUD" },
-    "foreignAmount": { "value": "-30000", "valueInBaseUnits": -3000000, "currencyCode": "JPY" },
+    "foreignAmount": { "value": "-30000", "valueInBaseUnits": -30000, "currencyCode": "JPY" },
     "createdAt": "2025-09-22T11:00:00+09:00"
   },
   "relationships": {

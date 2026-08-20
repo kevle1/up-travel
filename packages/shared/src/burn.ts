@@ -411,8 +411,12 @@ export function buildBurn(input: BurnInput): BurnState {
   // deposits) are shown so the user can see them and optionally toggle
   // "count as credit" to apply them against burn.
   const feed: FeedRow[] = [];
+  // Every foreign amount the client sees passes through here, so this is the
+  // one place that has to hold the line: a non-finite value must never reach
+  // the wire. JSON.stringify turns NaN into null, which reads as 0 in one
+  // caller and throws in the next - better to have no foreign side at all.
   const foreignFor = (amt: number | null, ccy: string | null) =>
-    amt != null && ccy ? { value: Math.abs(amt), currencyCode: ccy } : null;
+    amt != null && Number.isFinite(amt) && ccy ? { value: Math.abs(amt), currencyCode: ccy } : null;
   for (const t of transactions) {
     const o = overrideById.get(t.id);
     // Excluded rows stay in the feed (greyed in UI) so the user can re-include

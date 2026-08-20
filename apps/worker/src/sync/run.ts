@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/d1";
 import { eq } from "drizzle-orm";
-import { UpTransactionSchema } from "@up-travel/shared";
+import { UpTransactionSchema, upMoneyToMajor } from "@up-travel/shared";
 import { transactions, trips } from "../db/schema";
 import { buildCityLookup } from "../db/city-lookup";
 import { classifyUpTransaction } from "./classify";
@@ -39,8 +39,16 @@ export async function runSync(deps: RunSyncDeps): Promise<{ processed: number }>
     const occurredAt = Date.parse(t.attributes.createdAt);
     // Store the foreign side as the signed major-unit decimal (e.g. -142.30),
     // matching the user-facing semantics. amountAudCents stays as base units.
-    const foreignAmount = t.attributes.foreignAmount ? Number(t.attributes.foreignAmount.value) : null;
-    const foreignCurrency = t.attributes.foreignAmount?.currencyCode ?? null;
+    // upMoneyToMajor() reads Up's integer base-units field rather than its
+    // formatted `value` string - see the note on that function for why.
+    const foreignAmount = t.attributes.foreignAmount
+      ? upMoneyToMajor(t.attributes.foreignAmount)
+      : null;
+    // Currency travels with the amount: if we couldn't read a number, the row
+    // has no foreign side at all rather than a currency labelling nothing.
+    const foreignCurrency = foreignAmount === null
+      ? null
+      : t.attributes.foreignAmount?.currencyCode ?? null;
     const method = c.isAtm ? "ATM" : t.attributes.cardPurchaseMethod?.method ?? null;
 
     const values = {

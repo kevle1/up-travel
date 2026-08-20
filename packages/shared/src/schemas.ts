@@ -168,11 +168,50 @@ export const ManualSpendCreateSchema = z.object({
 export type ManualSpendCreate = z.infer<typeof ManualSpendCreateSchema>;
 
 // ── Up Bank API shapes (used by sync + classify) ──────────────────────────────
-const UpMoney = z.object({
+const UpMoneySchema = z.object({
   value: z.string(),
   valueInBaseUnits: z.number().int(),
   currencyCode: z.string().length(3),
 });
+export type UpMoney = z.infer<typeof UpMoneySchema>;
+
+/** Minor units per major unit for an ISO 4217 code: 100 for EUR, 1 for JPY,
+ *  1000 for BHD. Intl carries the full table, so there's nothing to maintain
+ *  here; an unknown code falls back to the 2-decimal majority. */
+function minorUnitScale(currencyCode: string): number {
+  try {
+    const digits = new Intl.NumberFormat("en", { style: "currency", currency: currencyCode })
+      .resolvedOptions().maximumFractionDigits ?? 2;
+    return 10 ** digits;
+  } catch {
+    return 100;
+  }
+}
+
+/** Up sends every amount twice: `value`, a decimal formatted for humans, and
+ *  `valueInBaseUnits`, an integer count of the currency's smallest unit. Read
+ *  the integer.
+ *
+ *  `value` is a presentation field and its formatting is not ours to depend
+ *  on: `Number("1,320.00")` is NaN, and a NaN that reaches the database is
+ *  stored as the text "NaN", comes back as NaN, and is serialised to JSON as
+ *  null - which rendered every foreign amount as "0.00" and threw in any
+ *  caller that touched `.toLocaleString()`. AUD came through that same episode
+ *  unharmed precisely because it was already read from base units.
+ *
+ *  Returns null when neither field yields a usable number, so callers can drop
+ *  the foreign side rather than invent a zero. */
+export function upMoneyToMajor(m: UpMoney): number | null {
+  if (Number.isFinite(m.valueInBaseUnits)) {
+    return m.valueInBaseUnits / minorUnitScale(m.currencyCode);
+  }
+  // Number("") is 0, and a blank string is exactly the case where inventing a
+  // zero would be worst - so require some content before trusting it.
+  if (!m.value.trim()) return null;
+  const parsed = Number(m.value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 const UpRel = z.object({ data: z.object({ id: z.string(), type: z.string() }).nullable() });
 
 export const UpTransactionSchema = z.object({
@@ -182,8 +221,8 @@ export const UpTransactionSchema = z.object({
     rawText: z.string().nullable(),
     description: z.string(),
     message: z.string().nullable().optional(),
-    amount: UpMoney,
-    foreignAmount: UpMoney.nullable(),
+    amount: UpMoneySchema,
+    foreignAmount: UpMoneySchema.nullable(),
     cardPurchaseMethod: z.object({
       method: z.string(),
       cardNumberSuffix: z.string().nullable().optional(),
