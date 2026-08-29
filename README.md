@@ -36,7 +36,7 @@ Each trip keeps its own budget, dates, current city, transactions, stays, cash l
 
 One $400 hop reads as a blown day on a $200 target, then drags your 7-day average behind it for a week. Trip settings has a **Keep out of daily pace** toggle for Flights & Intercity.
 
-Switched on, that spend leaves the day chart, the averages, the target comparison and the category breakdown — but **Budget left, runway and your projected finish still account for it**, because the money genuinely went. Your pace reads true and your budget reads true at the same time. The rows stay in Spend, tagged *Off pace* rather than greyed, since they do still count somewhere. Today's Budget left tile shows the off-pace total alongside it so it never goes invisible.
+Switched on, that spend leaves the day chart, the averages, the target comparison and the category breakdown — but **Budget left, runway and your projected finish still account for it**, because the money genuinely went. Your pace reads true and your budget reads true at the same time. The rows stay in Spend, tagged *Off pace* rather than greyed, since they do still count somewhere. Today's Budget left tile shows the off-pace total alongside it so it never goes invisible, and Trends breaks that total down by category in its own **Off pace** section underneath "Where it goes".
 
 Re-tagging a single transaction into Flights & Intercity moves it off pace too, so a long-distance bus tagged by hand behaves like a booked flight.
 

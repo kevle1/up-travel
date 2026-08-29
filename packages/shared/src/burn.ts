@@ -140,6 +140,9 @@ export interface BurnState {
    *  asOf. Off the pace maths, still off the budget - so
    *  cumulative = sum(series) + offPaceTotal. 0 when nothing is excluded. */
   offPaceTotal: number;
+  /** offPaceTotal split by category - e.g. how much of it was flights vs.
+   *  intercity. Sums to offPaceTotal; empty when nothing is excluded. */
+  offPaceCategories: CatRow[];
   target: number; // dollars/day
   budget: number; // dollars
   budgetLeft: number;
@@ -257,6 +260,14 @@ export function buildBurn(input: BurnInput): BurnState {
   const offPaceCats = new Set(trip.paceExcludedCategories);
   const withinWindow = (k: string) => k >= trip.startDate && k <= asOf;
   let offPaceTotal = 0;
+  // Per-category half of offPaceTotal - the breakdown that would otherwise
+  // never exist, since this money never reaches catDaily below.
+  const offPaceByCat: Record<string, number> = {};
+  const addOffPace = (cat: string, k: string, v: number) => {
+    if (!withinWindow(k)) return;
+    offPaceTotal = round2(offPaceTotal + v);
+    offPaceByCat[cat] = round2((offPaceByCat[cat] ?? 0) + v);
+  };
 
   for (const t of transactions) {
     if (t.isTransfer) continue;
@@ -276,7 +287,7 @@ export function buildBurn(input: BurnInput): BurnState {
     // lands whole, on the day the money actually went, or not yet at all if
     // that day is still ahead.
     if (offPaceCats.has(cat)) {
-      if (withinWindow(startKey)) offPaceTotal = round2(offPaceTotal + full);
+      addOffPace(cat, startKey, full);
       continue;
     }
     // Optional spread: amortise across N days starting at occurredAt. Useful
@@ -306,7 +317,7 @@ export function buildBurn(input: BurnInput): BurnState {
       const k = isoOf(new Date(d));
       if (k > asOf) break;
       if (stayOffPace) {
-        if (withinWindow(k)) offPaceTotal = round2(offPaceTotal + s.perNight);
+        addOffPace("accommodation", k, s.perNight);
       } else {
         addBucket(k, "Stay", s.perNight, "accommodation");
       }
@@ -366,23 +377,30 @@ export function buildBurn(input: BurnInput): BurnState {
   const cashFloat = round2(withdrawn - spent);
 
   // ── Category breakdowns over various windows ───────────────────────────────
-  const breakdownOver = (keys: string[]) => {
-    const totals: Record<string, number> = {};
-    for (const k of keys) {
-      const cd = catDaily[k] ?? {};
-      for (const cat in cd) totals[cat] = round2((totals[cat] ?? 0) + cd[cat]!);
-    }
-    const items: CatRow[] = Object.entries(totals)
+  const rowsFrom = (totals: Record<string, number>): CatRow[] =>
+    Object.entries(totals)
       .filter(([, amt]) => amt > 0)
       .map(([cat, amount]) => {
         const tc = travelCategory(cat);
         return { cat, label: tc.label, bucket: tc.bucket, color: tc.color, amount: round2(amount) };
       })
       .sort((a, b) => b.amount - a.amount);
+  const breakdownOver = (keys: string[]) => {
+    const totals: Record<string, number> = {};
+    for (const k of keys) {
+      const cd = catDaily[k] ?? {};
+      for (const cat in cd) totals[cat] = round2((totals[cat] ?? 0) + cd[cat]!);
+    }
+    const items = rowsFrom(totals);
     const total = round2(items.reduce((a, x) => a + x.amount, 0));
     return { items, total, days: keys.length };
   };
   const last = (n: number) => dayKeys.slice(Math.max(0, dayKeys.length - n));
+  // The flip side of the breakdowns above: what breakdownOver() can never
+  // show because addBucket() never saw it. Not windowed like those - off-pace
+  // spend doesn't build a day series to slice - just everything from
+  // trip.startDate to asOf, the same scope as offPaceTotal.
+  const offPaceCategories = rowsFrom(offPaceByCat);
 
   const yesterdayKey = N >= 2 ? dayKeys[N - 2]! : null;
   const yesterdayRow = yesterdayKey ? daily[yesterdayKey]! : null;
@@ -495,7 +513,7 @@ export function buildBurn(input: BurnInput): BurnState {
     asOf, dayNumber: N, plannedDays, daysLeft,
     isComplete, partialToday,
     series, todayBurn: todayRow.total, todayRow, yesterdayRow,
-    avgAll, avg7, avg30, cumulative, offPaceTotal,
+    avgAll, avg7, avg30, cumulative, offPaceTotal, offPaceCategories,
     target, budget, budgetLeft, banked,
     runwayDays, projectedTotal, projectedEnd, finalEnd, safeDaily,
     cashFloat, cityByDay,

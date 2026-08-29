@@ -368,6 +368,14 @@ describe("buildBurn - categories held out of the daily pace", () => {
     expect(off.catBreakdownByWindow.all.items.map((i) => i.cat)).toContain("intercity");
   });
 
+  it("still surfaces the flight total in its own category breakdown", () => {
+    expect(on.offPaceCategories).toEqual([
+      { cat: "intercity", label: "Flights & Intercity", bucket: "Transport", color: expect.any(String), amount: 400 },
+    ]);
+    // Nothing excluded: the whole idea is moot, not just empty by coincidence.
+    expect(off.offPaceCategories).toEqual([]);
+  });
+
   it("keeps the row in the feed, flagged rather than hidden", () => {
     const row = on.feed.find((r) => r.id === "flight")!;
     expect(row.offPace).toBe(true);

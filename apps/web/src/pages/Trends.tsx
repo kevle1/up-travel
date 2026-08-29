@@ -48,6 +48,22 @@ export function Trends({ burn, chartStyle }: { burn: BurnState; chartStyle: Char
       }>Where it goes</SectionLabel>
       <Card><CatList items={catView.items} total={catView.total} /></Card>
 
+      {/* Categories held out of the pace maths (Trip settings > Keep out of
+          daily pace) never show up in "Where it goes" above - that's the
+          point of the setting. This is the only place their total still
+          surfaces, so a flight doesn't just vanish from the trip's records. */}
+      {burn.offPaceCategories.length > 0 && (
+        <>
+          <SectionLabel>Off pace</SectionLabel>
+          <Card>
+            <CatList items={burn.offPaceCategories} total={burn.offPaceTotal} />
+            <div style={{ fontSize: 11.5, color: "var(--ink-3)", marginTop: 14, lineHeight: 1.5 }}>
+              Whole trip so far - kept out of the pace and averages above, but still counted against your budget.
+            </div>
+          </Card>
+        </>
+      )}
+
       <SectionLabel>Biggest spends</SectionLabel>
       <Card pad={6}>
         {burn.outliers.length === 0 && (
