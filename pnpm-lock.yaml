@@ -73,8 +73,8 @@ importers:
         specifier: 0.36.4
         version: 0.36.4(@cloudflare/workers-types@4.20260613.1)(@types/react@18.3.11)(react@18.3.1)
       hono:
-        specifier: 4.6.5
-        version: 4.6.5
+        specifier: 4.13.5
+        version: 4.13.5
       zod:
         specifier: 3.23.8
         version: 3.23.8
@@ -1349,6 +1349,7 @@ packages:
   eslint@9.13.0:
     resolution: {integrity: sha512-EYZK6SX6zjFHST/HRytOdA/zE72Cq/bfw45LSyuwrdvcclb/gqV8RRQxywOBEWO2+WDpva6UZa4CcDeJKzUCFA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+    deprecated: This version is no longer supported. Please see https://eslint.org/version-support for other options.
     hasBin: true
     peerDependencies:
       jiti: '*'
@@ -1442,8 +1443,8 @@ packages:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
 
-  hono@4.6.5:
-    resolution: {integrity: sha512-qsmN3V5fgtwdKARGLgwwHvcdLKursMd+YOt69eGpl1dUCJb8mCd7hZfyZnBYjxCegBG7qkJRQRUy2oO25yHcyQ==}
+  hono@4.13.5:
+    resolution: {integrity: sha512-O6+/eCYRkzzzy0rPWwKLiGBR1nFuUPZynnwjxN1MBA62NNqbT0wQEzQyK2gSO5yDIDB336sXQleAhOHrzlYyKw==}
     engines: {node: '>=16.9.0'}
 
   ignore@5.3.2:
@@ -3032,7 +3033,7 @@ snapshots:
 
   has-flag@4.0.0: {}
 
-  hono@4.6.5: {}
+  hono@4.13.5: {}
 
   ignore@5.3.2: {}
 
