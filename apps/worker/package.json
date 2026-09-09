@@ -22,7 +22,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "0.12.21",
     "@cloudflare/workers-types": "4.20260613.1",
-    "vitest": "2.1.2",
+    "vitest": "4.1.11",
     "wrangler": "4.100.0"
   }
 }
